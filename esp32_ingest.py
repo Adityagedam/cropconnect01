@@ -28,6 +28,9 @@ def env(name: str, default: str) -> str:
 
 db_url = os.getenv("MYSQL_PUBLIC_URL")
 
+if not db_url:
+    raise RuntimeError("MYSQL_PUBLIC_URL is missing")
+
 url = urlparse(db_url)
 
 DB_CONFIG = {
