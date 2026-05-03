@@ -32,10 +32,10 @@ url = urlparse(db_url)
 
 DB_CONFIG = {
     "host": url.hostname,
-    "port": url.port,
+    "port": int(url.port or 3306),
     "user": url.username,
     "password": url.password,
-    "database": url.path[1:]
+    "database": url.path[1:] or "railway"
 }
 FARMERS_DATABASE = env("MYSQL_FARMERS_DATABASE", "farmers")
 
