@@ -8,8 +8,8 @@ import { Label } from "../components/ui/label";
 import { toast } from "sonner";
 
 const API_BASE_URL =
-  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app";
-const API = `${API_BASE_URL}/api`;
+  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app/api";
+const API = API_BASE_URL.replace(/\/$/, "");
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -59,7 +59,7 @@ export default function LoginPage() {
     } catch (err) {
       const detail = err?.response?.data?.detail;
       if (!err?.response) {
-        toast.error(`Could not connect to backend at ${API_BASE_URL}. Please try again.`);
+        toast.error(`Could not connect to backend at ${API}. Please try again.`);
       } else {
         toast.error(typeof detail === "string" ? detail : "Invalid email or password");
       }

@@ -46,8 +46,8 @@ import LanguageSelect, { languages } from "../components/LanguageSelect";
 import { toast } from "sonner";
 
 const API_BASE_URL =
-  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app";
-const API = `${API_BASE_URL}/api`;
+  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app/api";
+const API = API_BASE_URL.replace(/\/$/, "");
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -1328,7 +1328,7 @@ export default function Dashboard() {
         {
           id: Date.now() + 1,
           type: "bot",
-          text: error.message || `I could not reach the AI server right now. Please make sure the backend is running at ${API_BASE_URL} and has OPENAI_API_KEY configured for GPT answers.`,
+          text: error.message || `I could not reach the AI server right now. Please make sure the backend is running at ${API} and has OPENAI_API_KEY configured for GPT answers.`,
         },
       ]);
     } finally {

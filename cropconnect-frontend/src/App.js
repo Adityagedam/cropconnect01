@@ -6,7 +6,6 @@ import LoginPage from "./pages/LoginPage";
 import SignInPage from "./pages/SignInPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import Dashboard from "./pages/Dashboard";
-const API_BASE_URL = "https://cropconnect01-production.up.railway.app";
 
 function App() {
   return (

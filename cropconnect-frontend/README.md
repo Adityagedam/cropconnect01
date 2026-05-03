@@ -18,7 +18,7 @@ farmers can act on instantly.
 yarn install        # or: npm install
 
 # 2. (Optional) Configure backend URL
-echo "REACT_APP_BACKEND_URL=https://cropconnect01-production.up.railway.app" > .env
+echo "REACT_APP_BACKEND_URL=https://cropconnect01-production.up.railway.app/api" > .env
 
 # 3. Start dev server
 yarn start          # opens http://localhost:3000

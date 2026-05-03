@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 
 const API_BASE_URL =
-  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app";
-const API = `${API_BASE_URL}/api`;
+  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app/api";
+const API = API_BASE_URL.replace(/\/$/, "");
 
 const META = {
   soil_moisture: { label: "Soil moisture", icon: Droplets, accent: "#1B4332" },
