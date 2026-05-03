@@ -25,8 +25,8 @@
     "postcss": "^8.4.47"
   },
   "scripts": {
-    "start": "craco start",
-    "build": "craco build"
+    "start": "node ./node_modules/@craco/craco/dist/bin/craco.js start",
+    "build": "node ./node_modules/@craco/craco/dist/bin/craco.js build"
   },
   "browserslist": {
     "production": [">0.2%", "not dead", "not op_mini all"],
