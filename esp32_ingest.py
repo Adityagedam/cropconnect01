@@ -12,7 +12,7 @@ from typing import Any
 from urllib.parse import urlparse
 import mysql.connector
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -759,30 +759,7 @@ def reading_to_sensor_list(row: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-@app.get("/api/health")
-def health():
-    try:
-      ensure_sensor_tables()
-      ensure_farmers_tables()
-      with get_connection() as conn:
-          conn.ping(reconnect=True, attempts=1, delay=0)
-      return {"ok": True, "database": "connected", "farmers_database": FARMERS_DATABASE}
-    except Exception as exc:
-      raise HTTPException(status_code=503, detail=f"Database not connected: {exc}") from exc
-
-
-@app.get("/")
-def root():
-    return {
-        "service": "CropConnect ESP32 Ingestion API",
-        "docs": "/docs",
-        "health": "/api/health",
-    }
-
-
-@app.post("/api/telemetry/ingest")
-def ingest_telemetry(payload: TelemetryIn, x_api_key: str | None = Header(default=None)):
-    check_api_key(x_api_key)
+def insert_telemetry_reading(payload: TelemetryIn) -> int:
     ensure_sensor_tables()
 
     insert_sql = """
@@ -818,12 +795,77 @@ def ingest_telemetry(payload: TelemetryIn, x_api_key: str | None = Header(defaul
             reading_id = cursor.lastrowid
         conn.commit()
 
+    return int(reading_id)
+
+
+def first_present(data: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = data.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def esp32_payload_to_telemetry(data: dict[str, Any]) -> TelemetryIn:
+    return TelemetryIn(
+        device_id=first_present(data, "device_id", "deviceId", "device", "id") or "sim-node-1",
+        soil_moisture=first_present(data, "soil_moisture", "soilMoisture", "moisture"),
+        humidity=first_present(data, "humidity", "hum"),
+        temperature=first_present(data, "temperature", "temp"),
+        ph=first_present(data, "ph", "soil_ph", "soilPh"),
+        nitrogen=first_present(data, "nitrogen", "n"),
+        phosphorus=first_present(data, "phosphorus", "p"),
+        potassium=first_present(data, "potassium", "k"),
+    )
+
+
+@app.get("/api/health")
+def health():
+    try:
+      ensure_sensor_tables()
+      ensure_farmers_tables()
+      with get_connection() as conn:
+          conn.ping(reconnect=True, attempts=1, delay=0)
+      return {"ok": True, "database": "connected", "farmers_database": FARMERS_DATABASE}
+    except Exception as exc:
+      raise HTTPException(status_code=503, detail=f"Database not connected: {exc}") from exc
+
+
+@app.get("/")
+def root():
+    return {
+        "service": "CropConnect ESP32 Ingestion API",
+        "docs": "/docs",
+        "health": "/api/health",
+    }
+
+
+@app.post("/api/telemetry/ingest")
+def ingest_telemetry(payload: TelemetryIn, x_api_key: str | None = Header(default=None)):
+    check_api_key(x_api_key)
+    reading_id = insert_telemetry_reading(payload)
+
     return {
         "ok": True,
         "id": reading_id,
         "device_id": payload.device_id,
         "received_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.post("/data")
+async def receive(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        data = dict(request.query_params)
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Expected a JSON object")
+
+    payload = esp32_payload_to_telemetry(data)
+    insert_telemetry_reading(payload)
+    return {"status": "ok"}
 
 
 @app.get("/api/sensors/latest")
