@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from email.message import EmailMessage
 from typing import Any
-
+from urllib.parse import urlparse
 import mysql.connector
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Query
@@ -26,12 +26,16 @@ def env(name: str, default: str) -> str:
     return os.getenv(name, default)
 
 
+db_url = os.getenv("MYSQL_PUBLIC_URL")
+
+url = urlparse(db_url)
+
 DB_CONFIG = {
-    "host": env("MYSQL_HOST", "127.0.0.1"),
-    "port": int(env("MYSQL_PORT", "3306")),
-    "user": env("MYSQL_USER", "root"),
-    "password": env("MYSQL_PASSWORD", ""),
-    "database": env("MYSQL_DATABASE", "cropconnect"),
+    "host": url.hostname,
+    "port": url.port,
+    "user": url.username,
+    "password": url.password,
+    "database": url.path[1:]
 }
 FARMERS_DATABASE = env("MYSQL_FARMERS_DATABASE", "farmers")
 
