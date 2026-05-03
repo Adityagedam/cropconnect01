@@ -44,10 +44,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import LanguageSelect, { languages } from "../components/LanguageSelect";
 import { toast } from "sonner";
-
-const API_BASE_URL =
-  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app/api";
-const API = API_BASE_URL.replace(/\/$/, "");
+import { API } from "../lib/api";
 
 const escapeHtml = (value) =>
   String(value ?? "")

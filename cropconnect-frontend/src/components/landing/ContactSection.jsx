@@ -7,10 +7,7 @@ import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { useLandingLanguage } from "./LandingLanguageContext";
-
-const API_BASE_URL =
-  process.env.REACT_APP_BACKEND_URL || "https://cropconnect01-production.up.railway.app/api";
-const API = API_BASE_URL.replace(/\/$/, "");
+import { API } from "../../lib/api";
 
 export default function ContactSection() {
   const { t } = useLandingLanguage();
