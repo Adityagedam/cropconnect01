@@ -1,0 +1,207 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --background: 44 43% 98%;      /* cream #FDFBF7 */
+    --foreground: 140 8% 10%;      /* #1A201C */
+    --card: 0 0% 100%;
+    --card-foreground: 140 8% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 140 8% 10%;
+    --primary: 151 46% 15%;        /* deep green #1B4332 */
+    --primary-foreground: 44 43% 98%;
+    --secondary: 12 65% 63%;       /* terracotta #E07A5F */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 44 18% 88%;
+    --muted-foreground: 140 8% 38%;
+    --accent: 44 30% 94%;
+    --accent-foreground: 151 46% 15%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 44 43% 98%;
+    --border: 44 14% 80%;
+    --input: 44 14% 80%;
+    --ring: 151 46% 15%;
+    --radius: 0.75rem;
+
+    --forest: #1B4332;
+    --forest-deep: #0F2A1F;
+    --leaf: #2D6A4F;
+    --moss: #52796F;
+    --terracotta: #E07A5F;
+    --clay: #C97B5C;
+    --wheat: #E3C77B;
+    --cream: #FDFBF7;
+    --sand: #F4F1EA;
+    --stone: #D5D1C5;
+    --ink: #1A201C;
+}
+
+* {
+    border-color: hsl(var(--border));
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    top: 0 !important;
+}
+
+.font-display {
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+}
+
+.dashboard-dark .bg-white {
+    background-color: #15241d !important;
+}
+
+.dashboard-dark .bg-gray-50,
+.dashboard-dark .bg-gray-100 {
+    background-color: #20342a !important;
+}
+
+.dashboard-dark .border-\[\#e8e3d8\],
+.dashboard-dark .border-gray-100,
+.dashboard-dark .border-gray-200,
+.dashboard-dark .border-gray-300 {
+    border-color: #314238 !important;
+}
+
+.dashboard-dark input,
+.dashboard-dark textarea,
+.dashboard-dark select {
+    background-color: #0f1d16 !important;
+    border-color: #314238 !important;
+    color: #f5f2ec !important;
+}
+
+.dashboard-dark input::placeholder,
+.dashboard-dark textarea::placeholder {
+    color: #91a195 !important;
+}
+
+.dashboard-dark .text-gray-400,
+.dashboard-dark .text-gray-600,
+.dashboard-dark .text-\[\#1A201C\] {
+    color: #cbd6ce !important;
+}
+
+.font-mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Grain overlay — applied globally via a fixed pseudo layer */
+.grain::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.08;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.1  0 0 0 0 0.15  0 0 0 0 0.12  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Label pill */
+.eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--forest);
+}
+
+/* Live blinking dot */
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    animation: pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+    50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+}
+
+/* Soft float for floating card */
+.float-soft {
+    animation: floatY 7s ease-in-out infinite;
+}
+@keyframes floatY {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+/* Slow rotating ring for the ecosystem center */
+.spin-slow {
+    animation: rotate 42s linear infinite;
+}
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Reveal on load stagger */
+.reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: reveal 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+@keyframes reveal {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ticker rail */
+.marquee {
+    animation: marquee 40s linear infinite;
+}
+@keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+/* Divider dashed organic */
+.dashed-ring {
+    background-image: radial-gradient(circle, rgba(27,67,50,0.25) 1px, transparent 1px);
+    background-size: 10px 10px;
+}
+
+/* Custom selection */
+::selection {
+    background: var(--forest);
+    color: var(--cream);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--sand); }
+::-webkit-scrollbar-thumb { background: #bcb8a9; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--forest); }
+
+/* Link underline */
+.link-u {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 0.35s ease;
+}
+.link-u:hover { background-size: 100% 1px; }
+
+/* Utility: soft elevation on hover */
+.hover-lift { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.hover-lift:hover { transform: translateY(-3px); box-shadow: 0 10px 30px -15px rgba(15, 42, 31, 0.35); }
