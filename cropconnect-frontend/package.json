@@ -25,6 +25,7 @@
     "postcss": "^8.4.47"
   },
   "scripts": {
+    "prebuild": "node ./scripts/ensure-public-index.js",
     "start": "node ./node_modules/@craco/craco/dist/bin/craco.js start",
     "build": "node ./node_modules/@craco/craco/dist/bin/craco.js build"
   },
