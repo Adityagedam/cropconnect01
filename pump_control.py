@@ -108,12 +108,15 @@ def send_pump_signal(payload: PumpStateIn) -> dict[str, Any]:
             detail=f"ESP32 rejected pump command with HTTP {exc.code}: {detail}",
         ) from exc
     except urllib.error.URLError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Could not reach ESP32 pump controller: {exc.reason}",
-        ) from exc
+        return {
+            "sent": False,
+            "message": f"Pump command queued for ESP32 polling. Direct ESP32 push failed: {exc.reason}",
+        }
     except TimeoutError as exc:
-        raise HTTPException(status_code=504, detail="ESP32 pump controller timed out") from exc
+        return {
+            "sent": False,
+            "message": "Pump command queued for ESP32 polling. Direct ESP32 push timed out.",
+        }
 
 
 @router.post("/state")
