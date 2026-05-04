@@ -82,7 +82,9 @@ GET http://localhost:8001/api/sensors/latest?device_id=sim-node-1
 
 ## ESP32 WiFi Pump Control
 
-For Railway production, use polling mode. The website posts pump changes to:
+Use polling mode for Railway production. The cloud backend cannot directly call an ESP32 on private WiFi or mobile hotspot, so the ESP32 connects outward to Railway every 3 seconds.
+
+The website posts pump changes to:
 
 ```text
 POST https://cropconnect01-production.up.railway.app/api/pump/state
@@ -94,21 +96,24 @@ The ESP32 should poll:
 GET https://cropconnect01-production.up.railway.app/api/esp32/relay-command
 ```
 
+After applying the relay states, the ESP32 sends status back to:
+
+```text
+POST https://cropconnect01-production.up.railway.app/api/esp32/relay-status
+Header: X-API-Key: dev-secret-key
+```
+
 That endpoint returns plain text for 8 relays:
 
 ```text
 1on 2off 3off 4off 5off 6off 7off 8off
 ```
 
-In your sketch, set:
+You can view the last reported relay status at:
 
-```cpp
-const char* serverURL = "https://cropconnect01-production.up.railway.app/api/esp32/relay-command";
+```text
+GET https://cropconnect01-production.up.railway.app/api/esp32/relay-status
 ```
-
-`HTTPClient` needs the `https://` protocol and the `/api/esp32/relay-command` path.
-
-## ESP32 Direct WiFi Pump Control
 
 Flash this sketch to the ESP32:
 
@@ -122,30 +127,25 @@ Before flashing, edit:
 const char* WIFI_SSID = "YOUR_WIFI_NAME";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* API_KEY = "dev-secret-key";
-const int PUMP_1_RELAY_PIN = 26;
-const int PUMP_2_RELAY_PIN = 27;
 ```
 
-Open Arduino Serial Monitor after upload. Copy the printed ESP32 IP address into backend `.env`:
+Relay pins are configured here:
+
+```cpp
+const int RELAY_PINS[RELAY_COUNT] = {19, 18, 5, 17, 32, 33, 25, 14};
+```
+
+Set Railway backend variables:
 
 ```bash
-ESP32_PUMP_BASE_URL=http://192.168.x.x
-ESP32_PUMP_API_KEY=dev-secret-key
-ESP32_PUMP_COMMAND_MODE=json
+ESP32_PUMP_COMMAND_MODE=poll
+ESP32_PUMP_BASE_URL=
+ESP32_API_KEY=dev-secret-key
 ```
 
-Restart the backend. The frontend pump switches call:
+Do not set `ESP32_PUMP_BASE_URL` to the ESP32 IP when using Railway. Leave it blank.
 
-```text
-POST http://localhost:8001/api/pump/state
-```
-
-The backend then sends the WiFi command to:
-
-```text
-POST http://ESP32_IP/pump
-Header: X-API-Key: dev-secret-key
-```
+Open Arduino Serial Monitor after upload. You should see command GETs and status POSTs every 3 seconds.
 
 Use a relay module between ESP32 and the pump. Do not connect pump power directly to ESP32 pins.
 

@@ -1,170 +1,131 @@
-#include <WebServer.h>
 #include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
-// Replace these values before flashing.
-const char* WIFI_SSID = "YOUR_WIFI_NAME";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* WIFI_SSID = "motorola edge 20 fusion_2684";
+const char* WIFI_PASSWORD = "12345678";
 const char* API_KEY = "dev-secret-key";
 
-// Relay pins. Change these to match your ESP32 wiring.
-const int PUMP_1_RELAY_PIN = 26;
-const int PUMP_2_RELAY_PIN = 27;
+const char* COMMAND_URL = "https://cropconnect01-production.up.railway.app/api/esp32/relay-command";
+const char* STATUS_URL = "https://cropconnect01-production.up.railway.app/api/esp32/relay-status";
 
-// Most relay boards are active LOW. Set false if your relay turns on with HIGH.
+const int RELAY_COUNT = 8;
+const int RELAY_PINS[RELAY_COUNT] = {19, 18, 5, 17, 32, 33, 25, 14};
 const bool RELAY_ACTIVE_LOW = true;
 
-WebServer server(80);
-const char* HEADER_KEYS[] = {"X-API-Key"};
+bool relayStates[RELAY_COUNT] = {false, false, false, false, false, false, false, false};
+unsigned long lastPollAt = 0;
+const unsigned long POLL_INTERVAL_MS = 3000;
 
-void writePumpRelay(int pin, bool on) {
+WiFiClientSecure secureClient;
+
+void writeRelay(int relayIndex, bool on) {
+  relayStates[relayIndex] = on;
   if (RELAY_ACTIVE_LOW) {
-    digitalWrite(pin, on ? LOW : HIGH);
+    digitalWrite(RELAY_PINS[relayIndex], on ? LOW : HIGH);
   } else {
-    digitalWrite(pin, on ? HIGH : LOW);
+    digitalWrite(RELAY_PINS[relayIndex], on ? HIGH : LOW);
   }
 }
 
-bool headerApiKeyIsValid() {
-  if (String(API_KEY).length() == 0) {
-    return true;
+void setAllRelays(bool on) {
+  for (int i = 0; i < RELAY_COUNT; i++) {
+    writeRelay(i, on);
   }
-
-  return server.header("X-API-Key") == API_KEY;
 }
 
-String jsonValue(String body, String key) {
-  String quotedKey = "\"" + key + "\"";
-  int keyIndex = body.indexOf(quotedKey);
-  if (keyIndex < 0) {
-    return "";
+void applyCommandPayload(String payload) {
+  payload.toLowerCase();
+  payload.trim();
+
+  Serial.println("Command: " + payload);
+
+  if (payload.indexOf("allon") != -1) {
+    setAllRelays(true);
+  }
+  if (payload.indexOf("alloff") != -1) {
+    setAllRelays(false);
   }
 
-  int colonIndex = body.indexOf(":", keyIndex + quotedKey.length());
-  if (colonIndex < 0) {
-    return "";
+  for (int i = 0; i < RELAY_COUNT; i++) {
+    String relayNumber = String(i + 1);
+    if (payload.indexOf(relayNumber + "on") != -1) {
+      writeRelay(i, true);
+    }
+    if (payload.indexOf(relayNumber + "off") != -1) {
+      writeRelay(i, false);
+    }
   }
-
-  int valueStart = colonIndex + 1;
-  while (valueStart < body.length() && isspace(body[valueStart])) {
-    valueStart++;
-  }
-
-  if (valueStart < body.length() && body[valueStart] == '"') {
-    int valueEnd = body.indexOf("\"", valueStart + 1);
-    return valueEnd > valueStart ? body.substring(valueStart + 1, valueEnd) : "";
-  }
-
-  int valueEnd = valueStart;
-  while (
-    valueEnd < body.length() &&
-    body[valueEnd] != ',' &&
-    body[valueEnd] != '}'
-  ) {
-    valueEnd++;
-  }
-
-  String value = body.substring(valueStart, valueEnd);
-  value.trim();
-  return value;
 }
 
-int pumpPinFromId(String pumpId) {
-  pumpId.toLowerCase();
-
-  if (pumpId == "1" || pumpId == "pump1") {
-    return PUMP_1_RELAY_PIN;
+String relayStatusJson() {
+  String body = "{\"device_id\":\"esp32-relay-1\",\"relays\":{";
+  for (int i = 0; i < RELAY_COUNT; i++) {
+    if (i > 0) {
+      body += ",";
+    }
+    body += "\"";
+    body += String(i + 1);
+    body += "\":";
+    body += relayStates[i] ? "true" : "false";
   }
-  if (pumpId == "2" || pumpId == "pump2") {
-    return PUMP_2_RELAY_PIN;
+  body += "}}";
+  return body;
+}
+
+void postRelayStatus() {
+  HTTPClient http;
+  http.begin(secureClient, STATUS_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-API-Key", API_KEY);
+
+  int httpCode = http.POST(relayStatusJson());
+  if (httpCode > 0) {
+    Serial.println("Status POST: " + String(httpCode));
+  } else {
+    Serial.println("Status POST failed: " + http.errorToString(httpCode));
   }
 
-  return -1;
+  http.end();
 }
 
-bool stateFromValue(String value) {
-  value.toLowerCase();
-  return value == "on" || value == "true" || value == "1";
-}
-
-void sendCorsHeaders() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key");
-  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-}
-
-void handleOptions() {
-  sendCorsHeaders();
-  server.send(204);
-}
-
-void handleHealth() {
-  sendCorsHeaders();
-  server.send(
-    200,
-    "application/json",
-    "{\"ok\":true,\"service\":\"CropConnect ESP32 pump controller\"}"
-  );
-}
-
-void handlePump() {
-  sendCorsHeaders();
-
-  if (!headerApiKeyIsValid()) {
-    server.send(401, "application/json", "{\"ok\":false,\"error\":\"Invalid API key\"}");
+void pollRelayCommand() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected. Reconnecting...");
+    WiFi.disconnect();
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     return;
   }
 
-  String pumpId = server.arg("pump");
-  String stateValue = server.arg("state");
+  HTTPClient http;
+  http.begin(secureClient, COMMAND_URL);
+  int httpCode = http.GET();
 
-  if (server.method() == HTTP_POST && server.hasArg("plain")) {
-    String body = server.arg("plain");
-
-    String jsonPump = jsonValue(body, "pump");
-    String jsonPumpId = jsonValue(body, "pump_id");
-    String jsonState = jsonValue(body, "state");
-    String jsonOn = jsonValue(body, "on");
-
-    if (jsonPump.length() > 0) {
-      pumpId = jsonPump;
-    } else if (jsonPumpId.length() > 0) {
-      pumpId = jsonPumpId;
-    }
-
-    if (jsonState.length() > 0) {
-      stateValue = jsonState;
-    } else if (jsonOn.length() > 0) {
-      stateValue = jsonOn;
-    }
-  }
-
-  int relayPin = pumpPinFromId(pumpId);
-  if (relayPin < 0) {
-    server.send(400, "application/json", "{\"ok\":false,\"error\":\"Unknown pump\"}");
+  if (httpCode == 200) {
+    String payload = http.getString();
+    http.end();
+    applyCommandPayload(payload);
+    postRelayStatus();
     return;
+  } else if (httpCode > 0) {
+    Serial.println("Command GET HTTP error: " + String(httpCode));
+    Serial.println(http.getString());
+  } else {
+    Serial.println("Command GET failed: " + http.errorToString(httpCode));
   }
 
-  bool turnOn = stateFromValue(stateValue);
-  writePumpRelay(relayPin, turnOn);
-
-  String response = "{";
-  response += "\"ok\":true,";
-  response += "\"pump\":\"" + pumpId + "\",";
-  response += "\"state\":\"" + String(turnOn ? "on" : "off") + "\",";
-  response += "\"relay_pin\":" + String(relayPin);
-  response += "}";
-
-  server.send(200, "application/json", response);
+  http.end();
 }
 
 void setup() {
   Serial.begin(115200);
 
-  pinMode(PUMP_1_RELAY_PIN, OUTPUT);
-  pinMode(PUMP_2_RELAY_PIN, OUTPUT);
-  writePumpRelay(PUMP_1_RELAY_PIN, false);
-  writePumpRelay(PUMP_2_RELAY_PIN, false);
+  for (int i = 0; i < RELAY_COUNT; i++) {
+    pinMode(RELAY_PINS[i], OUTPUT);
+    writeRelay(i, false);
+  }
 
+  secureClient.setInsecure();
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -175,20 +136,16 @@ void setup() {
   }
 
   Serial.println();
-  Serial.print("ESP32 pump controller IP: ");
+  Serial.print("Connected. ESP32 IP: ");
   Serial.println(WiFi.localIP());
 
-  server.collectHeaders(HEADER_KEYS, 1);
-  server.on("/", HTTP_GET, handleHealth);
-  server.on("/health", HTTP_GET, handleHealth);
-  server.on("/pump", HTTP_OPTIONS, handleOptions);
-  server.on("/pump", HTTP_GET, handlePump);
-  server.on("/pump", HTTP_POST, handlePump);
-  server.begin();
-
-  Serial.println("HTTP server ready on port 80");
+  pollRelayCommand();
 }
 
 void loop() {
-  server.handleClient();
+  unsigned long now = millis();
+  if (now - lastPollAt >= POLL_INTERVAL_MS) {
+    lastPollAt = now;
+    pollRelayCommand();
+  }
 }

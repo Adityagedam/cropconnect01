@@ -21,6 +21,8 @@ ESP32_PUMP_BASE_URL = env("ESP32_PUMP_BASE_URL").rstrip("/")
 ESP32_PUMP_API_KEY = env("ESP32_PUMP_API_KEY", env("ESP32_API_KEY", "dev-secret-key"))
 ESP32_PUMP_COMMAND_MODE = env("ESP32_PUMP_COMMAND_MODE", "poll").lower()
 RELAY_COMMAND_STATE: dict[int, bool] = {index: False for index in range(1, 9)}
+RELAY_APPLIED_STATE: dict[int, bool] = {index: False for index in range(1, 9)}
+RELAY_STATUS_UPDATED_AT = ""
 
 
 class PumpStateIn(BaseModel):
@@ -48,6 +50,28 @@ def relay_command_text() -> str:
         f"{relay_number}{'on' if RELAY_COMMAND_STATE[relay_number] else 'off'}"
         for relay_number in range(1, 9)
     )
+
+
+def update_relay_applied_state(states: dict[int, bool]) -> None:
+    global RELAY_STATUS_UPDATED_AT
+    for relay_number, on in states.items():
+        if 1 <= relay_number <= 8:
+            RELAY_APPLIED_STATE[relay_number] = on
+    RELAY_STATUS_UPDATED_AT = datetime.now(timezone.utc).isoformat()
+
+
+def relay_status_payload() -> dict[str, Any]:
+    return {
+        "desired": {
+            str(relay_number): RELAY_COMMAND_STATE[relay_number]
+            for relay_number in range(1, 9)
+        },
+        "applied": {
+            str(relay_number): RELAY_APPLIED_STATE[relay_number]
+            for relay_number in range(1, 9)
+        },
+        "updated_at": RELAY_STATUS_UPDATED_AT,
+    }
 
 
 def build_esp32_request(payload: PumpStateIn) -> urllib.request.Request:
@@ -80,10 +104,10 @@ def build_esp32_request(payload: PumpStateIn) -> urllib.request.Request:
 def send_pump_signal(payload: PumpStateIn) -> dict[str, Any]:
     update_relay_command_state(payload.pump_id, payload.on)
 
-    if ESP32_PUMP_COMMAND_MODE == "poll" or not ESP32_PUMP_BASE_URL:
+    if ESP32_PUMP_COMMAND_MODE not in {"direct", "query"} or not ESP32_PUMP_BASE_URL:
         return {
             "sent": False,
-            "message": "Pump command queued for ESP32 polling.",
+            "message": "Pump command sent to backend. ESP32 will apply it on the next WiFi poll.",
         }
 
     request = build_esp32_request(payload)
@@ -110,12 +134,12 @@ def send_pump_signal(payload: PumpStateIn) -> dict[str, Any]:
     except urllib.error.URLError as exc:
         return {
             "sent": False,
-            "message": f"Pump command queued for ESP32 polling. Direct ESP32 push failed: {exc.reason}",
+            "message": "Pump command sent to backend. ESP32 will apply it on the next WiFi poll.",
         }
     except TimeoutError as exc:
         return {
             "sent": False,
-            "message": "Pump command queued for ESP32 polling. Direct ESP32 push timed out.",
+            "message": "Pump command sent to backend. ESP32 will apply it on the next WiFi poll.",
         }
 
 

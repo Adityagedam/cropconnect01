@@ -17,7 +17,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from pump_control import relay_command_text, router as pump_router, update_relay_command_state
+from pump_control import (
+    relay_command_text,
+    relay_status_payload,
+    router as pump_router,
+    update_relay_applied_state,
+    update_relay_command_state,
+)
 
 
 load_dotenv()
@@ -216,6 +222,11 @@ class PumpStateSaveIn(BaseModel):
     schedule: dict[str, Any] = Field(default_factory=dict)
     sent_to_esp32: bool = False
     message: str | None = Field(default="", max_length=255)
+
+
+class RelayStatusIn(BaseModel):
+    device_id: str = Field(default="esp32-relay-1", max_length=80)
+    relays: dict[str, bool] = Field(default_factory=dict)
 
 
 class PumpTimersSaveIn(BaseModel):
@@ -878,6 +889,30 @@ def esp32_relay_command():
 @app.get("/esp32/relay-command", response_class=PlainTextResponse)
 def esp32_relay_command_short():
     return esp32_relay_command()
+
+
+@app.post("/api/esp32/relay-status")
+def esp32_relay_status(payload: RelayStatusIn, x_api_key: str | None = Header(default=None)):
+    check_api_key(x_api_key)
+    states: dict[int, bool] = {}
+    for relay_key, on in payload.relays.items():
+        try:
+            relay_number = int(relay_key)
+        except ValueError:
+            continue
+        states[relay_number] = bool(on)
+
+    update_relay_applied_state(states)
+    return {
+        "ok": True,
+        "device_id": payload.device_id,
+        "status": relay_status_payload(),
+    }
+
+
+@app.get("/api/esp32/relay-status")
+def get_esp32_relay_status():
+    return {"ok": True, "status": relay_status_payload()}
 
 
 @app.post("/api/telemetry/ingest")
