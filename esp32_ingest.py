@@ -343,6 +343,8 @@ class ChatIn(BaseModel):
     language: str = Field(default="en", max_length=16)
     input_language: str = Field(default="en", max_length=16)
     sensor_data: dict[str, Any] = Field(default_factory=dict)
+    market_data: dict[str, Any] = Field(default_factory=dict)
+    weather_data: dict[str, Any] = Field(default_factory=dict)
     location: str | None = Field(default="", max_length=160)
     history: list[dict[str, str]] = Field(default_factory=list, max_length=12)
 
@@ -864,8 +866,53 @@ def message_has_any(message: str, *terms: str) -> bool:
     return any(term in message for term in terms)
 
 
+def local_market_reply(payload: ChatIn) -> str:
+    prices = payload.market_data.get("prices") if isinstance(payload.market_data, dict) else None
+    mandis = payload.market_data.get("mandis") if isinstance(payload.market_data, dict) else None
+    location = payload.location or "your area"
+
+    if isinstance(prices, list) and prices:
+        price_lines = []
+        for crop in prices[:4]:
+            if not isinstance(crop, dict):
+                continue
+            name = crop.get("name") or "Crop"
+            price = crop.get("price")
+            change = crop.get("change")
+            trend = "up" if crop.get("up") else "down"
+            if price is not None:
+                price_lines.append(f"{name}: Rs {price}/qt ({trend}{'' if change is None else f' {change}%'})")
+
+        mandi_line = ""
+        if isinstance(mandis, list) and mandis:
+            nearest = [m.get("name") for m in mandis[:2] if isinstance(m, dict) and m.get("name")]
+            if nearest:
+                mandi_line = " Nearby mandis: " + ", ".join(nearest) + "."
+
+        if price_lines:
+            return (
+                f"For market decisions near {location}, compare today's dashboard rates first: "
+                + "; ".join(price_lines)
+                + "."
+                + mandi_line
+                + " If your crop is ready and the price is above your target, sell part now and hold the rest only if storage quality is safe."
+            )
+
+    return localized_chat_reply(payload, "market")
+
+
 def local_ai_reply(payload: ChatIn) -> str:
     message = payload.message.lower()
+    if message_has_any(message, "market", "price", "sell", "rate", "rates", "mandi", "bhav", "bazar", "मंडी", "भाव", "बेच", "बाजार", "ధర", "అమ్మ", "விலை", "விற்க", "দাম", "বিক্রি", "ಬೆಲೆ", "ಮಾರುಕಟ್ಟೆ"):
+        return local_market_reply(payload)
+    if message_has_any(message, "weather", "rain", "temperature", "forecast", "mausam", "barish", "baarish", "मौसम", "बारिश", "हवामान", "पाऊस", "వాతావరణం", "వర్షం", "வானிலை", "மழை", "আবহাওয়া", "বৃষ্টি", "ಹವಾಮಾನ", "ಮಳೆ"):
+        return localized_chat_reply(payload, "weather")
+    if message_has_any(message, "irrigat", "water", "watering", "moisture", "pani", "paani", "sinchai", "पानी", "सिंचाई", "पाणी", "सिंचन", "నీరు", "సాగు", "நீர்", "பாசனம்", "সেচ", "ನೀರು", "ನೀರಾವರಿ"):
+        return localized_chat_reply(payload, "irrigation")
+    if message_has_any(message, "fertilizer", "fertiliser", "npk", "nutrient", "khad", "khaad", "उर्वरक", "खाद", "खत", "ఎరువు", "உரம்", "সার", "ಗೊಬ್ಬರ"):
+        return localized_chat_reply(payload, "fertilizer")
+    if "ph" in message or "पीएच" in message:
+        return localized_chat_reply(payload, "ph")
     if message_has_any(message, "monsoon", "kharif", "crop", "grow", "fasal", "pika", "फसल", "पीक", "పంట", "பயிர்", "ফসল", "ಬೆಳೆ"):
         return localized_chat_reply(payload, "monsoon")
     if message_has_any(message, "health", "disease", "pest", "कीट", "रोग", "आरोग्य", "పురుగు", "రోగ", "நோய்", "পোকা", "রোগ", "ಕೀಟ", "ರೋಗ"):
@@ -1662,6 +1709,8 @@ def ai_chat(payload: ChatIn):
         "location": payload.location,
         "language": payload.language,
         "sensor_data": payload.sensor_data,
+        "market_data": payload.market_data,
+        "weather_data": payload.weather_data,
     }
     search_results = google_search(payload.message, payload.location)
 
@@ -1680,9 +1729,12 @@ def ai_chat(payload: ChatIn):
         {
             "role": "developer",
             "content": (
-                "You are CropConnect's farming assistant. Give concise, practical crop, irrigation, "
-                "weather, market, and sensor guidance. Use simple language, short paragraphs, and clear next steps. "
-                "Prefer 2-4 actionable points over long explanations. Use the supplied farm context and sensor values. "
+                "You are CropConnect's farming assistant for an IoT farming dashboard. "
+                "Your scope is crops, soil, irrigation, sensors, weather, pests/diseases, fertilizer, pumps, and market/mandi decisions. "
+                "Always answer the latest user question directly; never repeat or continue an older answer unless the latest question clearly asks for a follow-up. "
+                "Give concise, practical guidance with simple language, short paragraphs, and clear next steps. "
+                "Prefer 2-5 actionable points over long explanations. Use the supplied farm context, sensor values, market data, and weather data when relevant. "
+                "If the question is outside CropConnect's farming purpose, politely redirect it to farming help and offer useful farming topics. "
                 "If a question needs certified agronomy, veterinary, legal, medical, or financial advice, say so clearly. "
                 "When web search results are supplied, use them as supporting context and mention that the "
                 "answer is based on the available search snippets, not direct Google pages. "
@@ -1691,7 +1743,7 @@ def ai_chat(payload: ChatIn):
                 "but reply only in the selected language, not in the input language."
             ),
         },
-        {"role": "user", "content": "Farm context: " + str(context)},
+        {"role": "user", "content": "Current CropConnect dashboard context: " + json.dumps(context, ensure_ascii=False, default=str)},
     ]
     if search_results:
         messages.append(
@@ -1700,12 +1752,29 @@ def ai_chat(payload: ChatIn):
                 "content": "Google search context: " + str(search_results),
             }
         )
-    for item in payload.history[-8:]:
+    if payload.history:
+        messages.append(
+            {
+                "role": "user",
+                "content": "Earlier chat history below is context only. Do not answer it unless the latest question asks for a follow-up.",
+            }
+        )
+    for item in payload.history[-4:]:
         role = "assistant" if item.get("type") == "bot" else "user"
         text = item.get("text", "")
         if text:
             messages.append({"role": role, "content": text})
-    messages.append({"role": "user", "content": "Desired reply language: " + LANGUAGE_NAMES.get(selected_language(payload), payload.language) + ". Input language: " + payload.input_language + ". " + payload.message})
+    messages.append({
+        "role": "user",
+        "content": (
+            "Answer this latest question only. Desired reply language: "
+            + LANGUAGE_NAMES.get(selected_language(payload), payload.language)
+            + ". Input language: "
+            + payload.input_language
+            + ". Latest question: "
+            + payload.message
+        ),
+    })
 
     try:
         data = request_json(
@@ -1713,8 +1782,8 @@ def ai_chat(payload: ChatIn):
             {
                 "model": OPENAI_MODEL,
                 "messages": messages,
-                "temperature": 0.4,
-                "max_tokens": 450,
+                "temperature": 0.25,
+                "max_tokens": 600,
             },
             {"Authorization": f"Bearer {OPENAI_API_KEY}"},
         )

@@ -1612,8 +1612,10 @@ export default function Dashboard() {
           language,
           input_language: inputLanguage,
           sensor_data: sensorData,
+          market_data: marketData || {},
+          weather_data: weatherData || {},
           location: `${userData.locationType === "city" ? userData.city : userData.village || userData.city}, ${userData.state}`,
-          history: chatMessages.slice(-8).map((msg) => ({
+          history: chatMessages.slice(-4).map((msg) => ({
             type: String(msg.type || ""),
             text: humanizeApiValue(msg.text),
           })),
