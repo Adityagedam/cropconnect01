@@ -7,7 +7,7 @@
 const char* WIFI_SSID = "YOUR_WIFI_SSID";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* API_KEY = "dev-secret-key"; // Must match backend ESP32_API_KEY
-const char* DEVICE_ID = "sim-node-1";  // The same device_id your frontend/backend expect
+const char* DEVICE_ID = "sim-node-1";  // Must be the exact device ID shown in your dashboard's sensor setup (e.g. farm-1777841576132)
 
 const char* TELEMETRY_URL = "https://cropconnect01-production.up.railway.app/api/telemetry/ingest";
 

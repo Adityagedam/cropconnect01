@@ -75,8 +75,10 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 // API Configuration
 const char* API_KEY = "dev-secret-key";  // Must match backend ESP32_API_KEY
-const char* DEVICE_ID = "sim-node-1";    // Replace with a unique device_id for this ESP32
+const char* DEVICE_ID = "sim-node-1";    // Replace with the exact sensorDeviceId shown in your dashboard
 ```
+
+Important: if your dashboard says a sensor device is configured like `farm-1777841576132`, you must use that same `DEVICE_ID` on the ESP32. Otherwise the website will query the wrong device and live readings will not appear.
 
 For the pump-only sketch, use a unique `DEVICE_ID` such as `pump-node-1`.
 
