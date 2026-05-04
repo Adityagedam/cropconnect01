@@ -115,6 +115,46 @@ You can view the last reported relay status at:
 GET https://cropconnect01-production.up.railway.app/api/esp32/relay-status
 ```
 
+### Manual Pump Control
+
+To manually control the pump motor via WiFi, you can use the provided scripts:
+
+**Using Python script:**
+```bash
+# Turn pump on
+python control_pump.py on
+
+# Turn pump off
+python control_pump.py off
+
+# Control specific pump
+python control_pump.py on pump2
+```
+
+**Using batch file (Windows):**
+```cmd
+# Turn pump on
+control_pump.bat on
+
+# Turn pump off
+control_pump.bat off
+```
+
+**Using curl:**
+```bash
+# Turn on
+curl -X POST "https://cropconnect01-production.up.railway.app/api/pump/state" \
+  -H "Content-Type: application/json" \
+  -d '{"pump_id": "pump1", "on": true}'
+
+# Turn off
+curl -X POST "https://cropconnect01-production.up.railway.app/api/pump/state" \
+  -H "Content-Type: application/json" \
+  -d '{"pump_id": "pump1", "on": false}'
+```
+
+The ESP32 will receive the command on its next poll (every 3 seconds) and turn the motor on/off accordingly.
+
 Flash this sketch to the ESP32:
 
 ```text
