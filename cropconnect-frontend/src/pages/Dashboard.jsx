@@ -38,6 +38,8 @@ import {
   Router,
   ShieldCheck,
   Wifi,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -545,6 +547,9 @@ export default function Dashboard() {
   const [chatInput, setChatInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [speechRecognition, setSpeechRecognition] = useState(null);
+  const speechSentRef = useRef(false);
   const [pumpUpdating, setPumpUpdating] = useState({});
   const [scheduledTimers, setScheduledTimers] = useState({ pump1: [], pump2: [] });
   const [showTimerModal, setShowTimerModal] = useState({ show: false, pump: null });
@@ -774,7 +779,12 @@ export default function Dashboard() {
 
   const applyBackendReadings = useCallback((payload) => {
     const readings = Array.isArray(payload?.readings) ? payload.readings : [];
-    if (!readings.length) return false;
+    if (!readings.length) {
+      if (payload && !Array.isArray(payload?.readings)) {
+        console.warn("Unexpected sensor payload format:", payload);
+      }
+      return false;
+    }
 
     const byType = readings.reduce((acc, reading) => {
       if (!reading || typeof reading.sensor_type !== "string") return acc;
@@ -821,24 +831,49 @@ export default function Dashboard() {
   // Read latest ESP32 data from the backend. If unavailable, simulation continues.
   useEffect(() => {
     let cancelled = false;
-    const activeDeviceId = userData.sensorDeviceId || "sim-node-1";
+    const primaryDeviceId = userData.sensorDeviceId || "sim-node-1";
+    const fallbackDeviceId = "sim-node-1";
 
     const loadLatestReadings = async () => {
       try {
-        const response = await fetch(`${API}/sensors/latest?device_id=${encodeURIComponent(activeDeviceId)}`);
-        if (!response.ok) throw new Error(`Backend returned ${response.status}`);
-        const payload = await response.json();
-        if (cancelled) return;
+        const deviceIds = primaryDeviceId === fallbackDeviceId ? [primaryDeviceId] : [primaryDeviceId, fallbackDeviceId];
+        let payload = null;
+        let usedDeviceId = primaryDeviceId;
+
+        for (const deviceId of deviceIds) {
+          const response = await fetch(`${API}/sensors/latest?device_id=${encodeURIComponent(deviceId)}`);
+          if (!response.ok) throw new Error(`Backend returned ${response.status}`);
+          const candidate = await response.json();
+          if (cancelled) return;
+
+          if (Array.isArray(candidate?.readings) && candidate.readings.length > 0) {
+            payload = candidate;
+            usedDeviceId = deviceId;
+            break;
+          }
+
+          if (!payload) payload = candidate;
+        }
+
+        if (!payload) {
+          throw new Error("No response from sensor backend");
+        }
+
         const applied = applyBackendReadings(payload);
         if (!applied) {
+          const errorMessage = payload?.message || "Waiting for ESP32 readings";
+          const hint = usedDeviceId !== primaryDeviceId ? ` (fallback to ${usedDeviceId})` : "";
+          console.warn("ESP32 sensor payload not applied:", payload);
           setSensorConnection((prev) => ({
             ...prev,
             source: "simulated",
-            error: "Waiting for ESP32 readings",
+            deviceId: usedDeviceId,
+            error: errorMessage + hint,
           }));
         }
       } catch (error) {
         if (!cancelled) {
+          console.error("Failed to load latest ESP32 readings:", error);
           setSensorConnection((prev) => ({
             ...prev,
             source: "simulated",
@@ -1276,15 +1311,15 @@ export default function Dashboard() {
     const input = messageText.toLowerCase();
 
     if (!responseKeyOverride) {
-      if (input.includes("irrigate") || input.includes("सिंचाई") || input.includes("water") || input.includes("నీరు") || input.includes("ನೀರು") || input.includes("நீர்") || input.includes("সেচ")) {
+      if (input.includes("irrigate") || input.includes("सिंचाई") || input.includes("पानी") || input.includes("water") || input.includes("నీరు") || input.includes("ನೀರು") || input.includes("நீர்") || input.includes("সেচ")) {
         responseKey = "irrigate";
-      } else if (input.includes("fertilizer") || input.includes("उर्वरक") || input.includes("खत") || input.includes("ఎరువు") || input.includes("உர") || input.includes("সার") || input.includes("ಉರ") ) {
+      } else if (input.includes("fertilizer") || input.includes("उर्वरक") || input.includes("खाद") || input.includes("खत") || input.includes("ఎరువు") || input.includes("உர") || input.includes("সার") || input.includes("ಗೊಬ್ಬರ") ) {
         responseKey = "fertilizer";
-      } else if (input.includes("onion") || input.includes("प्याज") || input.includes("ಕांದೆ") || input.includes("ఉల్లిపాయ") || input.includes("வெங்காயம்") || input.includes("পিঁয়াজ")) {
+      } else if (input.includes("onion") || input.includes("प्याज") || input.includes("कांदा") || input.includes("ಈರುಳ್ಳಿ") || input.includes("ఉల్లిపాయ") || input.includes("வெங்காயம்") || input.includes("পিঁয়াজ")) {
         responseKey = "sellOnions";
       } else if (input.includes("ph")) {
         responseKey = "ph";
-      } else if (input.includes("weather") || input.includes("मौसम") || input.includes("ವಾತಾವರಣ") || input.includes("వాతావరణ") || input.includes("வானிலை") || input.includes("আবহাওয়া")) {
+      } else if (input.includes("weather") || input.includes("मौसम") || input.includes("हवामान") || input.includes("ವಾತಾವರಣ") || input.includes("వాతావరణ") || input.includes("வானிலை") || input.includes("আবহাওয়া")) {
         responseKey = "weather";
       }
     }
@@ -1296,9 +1331,116 @@ export default function Dashboard() {
       .replace("{ph}", sensorData.soilPh);
   };
 
-  const handleSendMessage = async (messageOverride, responseKeyOverride = null) => {
+  // Language detection function
+  const detectLanguage = (text) => {
+    if (!text || text.trim().length === 0) return language;
+
+    const devanagari = /[\u0900-\u097F]/;
+    const marathiKeywords = /(आहे|करू|मला|तुम्हाला|माझे|काय|कुठे|पाणी|शेत|तुमचा|माझ्या)/u;
+    const hindiKeywords = /(है|करो|मुझे|आपको|क्या|कहाँ|पानी|खेती|नहीं|तुम)/u;
+
+    if (devanagari.test(text)) {
+      if (marathiKeywords.test(text) && !hindiKeywords.test(text)) return 'mr';
+      return 'hi';
+    }
+    if (/[\u0C00-\u0C7F]/.test(text)) return 'te';
+    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta';
+    if (/[\u0C80-\u0CFF]/.test(text)) return 'kn';
+    if (/[\u0980-\u09FF]/.test(text)) return 'bn';
+    return 'en';
+  };
+  
+  // Get speech recognition language code
+  const getSpeechLangCode = (langCode) => {
+    const langMap = {
+      'en': 'en-US',
+      'hi': 'hi-IN',
+      'mr': 'mr-IN',
+      'te': 'te-IN',
+      'ta': 'ta-IN',
+      'kn': 'kn-IN',
+      'bn': 'bn-IN',
+    };
+    return langMap[langCode] || 'en-US';
+  };
+
+  // Speech recognition setup
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+      const recognition = new window.webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = getSpeechLangCode(language);
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        speechSentRef.current = false;
+        const selectedLangName = languages.find(l => l.code === language)?.name || language;
+        toast.info(`Listening... Speak your question in ${selectedLangName}`);
+      };
+
+      recognition.onresult = (event) => {
+        if (speechSentRef.current) return;
+        const transcript = event.results[0][0].transcript;
+        setChatInput(transcript);
+        
+        const detectedLang = detectLanguage(transcript);
+        const detectedLangName = languages.find(l => l.code === detectedLang)?.name || detectedLang;
+        const selectedLangName = languages.find(l => l.code === language)?.name || language;
+        if (detectedLang !== language) {
+          toast.info(`Detected ${detectedLangName}; answering in ${selectedLangName}.`);
+        } else {
+          toast.success(`${detectedLangName} detected! Sending response in ${selectedLangName}...`);
+        }
+        
+        speechSentRef.current = true;
+        setTimeout(() => handleSendMessage(transcript, null, detectedLang), 500);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'no-speech') {
+          toast.error("No speech detected. Please try again.");
+        } else if (event.error === 'network') {
+          toast.error("Network error. Please check your connection.");
+        } else {
+          toast.error(`Speech recognition failed: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      setSpeechRecognition(recognition);
+    }
+  }, [language]);
+
+  const startListening = () => {
+    if (speechRecognition && !isListening) {
+      try {
+        speechRecognition.lang = getSpeechLangCode(language);
+        speechRecognition.start();
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        toast.error("Could not start microphone. Please check permissions.");
+      }
+    } else if (!speechRecognition) {
+      toast.error("Speech recognition not supported in your browser. Try Chrome, Edge, or Safari.");
+    }
+  };
+
+  const stopListening = () => {
+    if (speechRecognition && isListening) {
+      speechRecognition.stop();
+    }
+  };
+
+  const handleSendMessage = async (messageOverride, responseKeyOverride = null, detectedLanguage = null) => {
     const messageText = (messageOverride ?? chatInput).trim();
     if (!messageText) return;
+    const inputLanguage = detectedLanguage || detectLanguage(messageText);
 
     const userMessage = { id: Date.now(), type: "user", text: messageText };
     setChatMessages((prev) => [...prev, userMessage]);
@@ -1314,6 +1456,7 @@ export default function Dashboard() {
           ...ownerPayload(),
           message: messageText,
           language,
+          input_language: inputLanguage,
           sensor_data: sensorData,
           location: `${userData.locationType === "city" ? userData.city : userData.village || userData.city}, ${userData.state}`,
           history: chatMessages.slice(-8).map((msg) => ({
@@ -1343,7 +1486,7 @@ export default function Dashboard() {
         {
           id: Date.now() + 1,
           type: "bot",
-          text: error.message || `I could not reach the AI server right now. Please make sure the backend is running at ${API} and has OPENAI_API_KEY configured for GPT answers.`,
+          text: error.message || buildLocalAiResponse(messageText, responseKeyOverride),
         },
       ]);
     } finally {
@@ -2458,11 +2601,25 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                <div className="flex gap-2 p-4 border-t" style={{ borderColor: colors.creamDark }}>
-                  <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSendMessage()} placeholder={ct("chatPlaceholder")} className="flex-1" />
-                  <Button onClick={() => handleSendMessage()} disabled={!chatInput.trim() || isTyping} className="bg-green-600 hover:bg-green-700">
-                    <Send className="w-4 h-4" />
-                  </Button>
+                <div className="flex flex-col gap-2 p-4 border-t" style={{ borderColor: colors.creamDark }}>
+                  <div className="flex gap-2">
+                    <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSendMessage()} placeholder={ct("chatPlaceholder")} className="flex-1" />
+                    <Button 
+                      onClick={isListening ? stopListening : startListening} 
+                      disabled={isTyping}
+                      className={`px-3 ${isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+                    >
+                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </Button>
+                    <Button onClick={() => handleSendMessage()} disabled={!chatInput.trim() || isTyping} className="bg-green-600 hover:bg-green-700">
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {language !== 'en' && (
+                    <p className="text-xs text-gray-500">
+                      Voice input listens in {languages.find((lang) => lang.code === language)?.name || language}; replies use the selected language.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -2949,11 +3106,16 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(45, 90, 61, 0.1)" }}>
-                <span className={`w-2 h-2 rounded-full animate-pulse ${sensorConnection.source === "esp32" ? "bg-green-500" : "bg-amber-500"}`} />
-                <span className="text-xs font-medium" style={{ color: colors.greenDark }}>
-                  {sensorConnection.deviceId} · {sensorConnection.source === "esp32" ? "ESP32 Live" : "Simulation"}
-                </span>
+              <div className="hidden sm:flex flex-col gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(45, 90, 61, 0.1)" }}>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full animate-pulse ${sensorConnection.source === "esp32" ? "bg-green-500" : "bg-amber-500"}`} />
+                  <span className="text-xs font-medium" style={{ color: colors.greenDark }}>
+                    {sensorConnection.deviceId} · {sensorConnection.source === "esp32" ? "ESP32 Live" : "Simulation"}
+                  </span>
+                </div>
+                {sensorConnection.source !== "esp32" && sensorConnection.error ? (
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-amber-800">{sensorConnection.error}</span>
+                ) : null}
               </div>
               <button onClick={() => setActivePage("notifications")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative" aria-label="Open notifications">
                 <Bell className="w-4 h-4" style={{ color: colors.textMid }} />

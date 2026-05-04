@@ -35,18 +35,23 @@ def env(name: str, default: str) -> str:
 
 db_url = os.getenv("MYSQL_PUBLIC_URL")
 
-if not db_url:
-    raise RuntimeError("MYSQL_PUBLIC_URL is missing")
-
-url = urlparse(db_url)
-
-DB_CONFIG = {
-    "host": url.hostname,
-    "port": int(url.port or 3306),
-    "user": url.username,
-    "password": url.password,
-    "database": url.path[1:] or "railway"
-}
+if db_url:
+    url = urlparse(db_url)
+    DB_CONFIG = {
+        "host": url.hostname,
+        "port": int(url.port or 3306),
+        "user": url.username,
+        "password": url.password,
+        "database": url.path[1:] or "railway"
+    }
+else:
+    DB_CONFIG = {
+        "host": env("MYSQL_HOST", "127.0.0.1"),
+        "port": int(env("MYSQL_PORT", "3306")),
+        "user": env("MYSQL_USER", "root"),
+        "password": env("MYSQL_PASSWORD", ""),
+        "database": env("MYSQL_DATABASE", "cropconnect"),
+    }
 FARMERS_DATABASE = env("MYSQL_FARMERS_DATABASE", "farmers")
 
 API_KEY = env("ESP32_API_KEY", "dev-secret-key")
@@ -121,6 +126,175 @@ PLANT_SOIL_TERMS = {
     "temperature",
     "sensor",
     "sensors",
+    "pani",
+    "paani",
+    "sinchai",
+    "kheti",
+    "khet",
+    "mitti",
+    "mati",
+    "fasal",
+    "khad",
+    "khaad",
+    "mausam",
+    "barish",
+    "baarish",
+    "mandi",
+    "bhav",
+    "bazar",
+}
+
+MULTILINGUAL_PLANT_SOIL_TERMS = {
+    "खेती",
+    "खेत",
+    "मिट्टी",
+    "फसल",
+    "पौधा",
+    "पानी",
+    "सिंचाई",
+    "उर्वरक",
+    "खाद",
+    "मौसम",
+    "कीट",
+    "रोग",
+    "शेती",
+    "शेत",
+    "माती",
+    "पीक",
+    "पाणी",
+    "सिंचन",
+    "खत",
+    "हवामान",
+    "పంట",
+    "పొలం",
+    "మట్టి",
+    "నీరు",
+    "సాగు",
+    "ఎరువు",
+    "వాతావరణం",
+    "పురుగు",
+    "நிலம்",
+    "பயிர்",
+    "மண்",
+    "நீர்",
+    "பாசனம்",
+    "உரம்",
+    "வானிலை",
+    "நோய்",
+    "খেত",
+    "খামার",
+    "মাটি",
+    "ফসল",
+    "সেচ",
+    "সার",
+    "আবহাওয়া",
+    "রোগ",
+    "ಕೃಷಿ",
+    "ಹೊಲ",
+    "ಮಣ್ಣು",
+    "ಬೆಳೆ",
+    "ನೀರು",
+    "ನೀರಾವರಿ",
+    "ಗೊಬ್ಬರ",
+    "ಹವಾಮಾನ",
+    "ರೋಗ",
+}
+
+LANGUAGE_NAMES = {
+    "en": "English",
+    "hi": "Hindi",
+    "mr": "Marathi",
+    "te": "Telugu",
+    "ta": "Tamil",
+    "bn": "Bengali",
+    "kn": "Kannada",
+}
+
+CHAT_REPLY_TEMPLATES = {
+    "en": {
+        "not_related": "Please ask a farming question about crops, soil, irrigation, fertilizer, weather, pests, or market prices.",
+        "monsoon": "For {location}, choose crops that fit drainage and rainfall. With soil moisture near {moisture}% and pH {ph}, soybean, pigeon pea, maize, or green gram can work well if seed and market demand are good. Avoid waterlogging-sensitive crops if the field stays wet for more than 24-48 hours.",
+        "health": "From the sensor data, crop conditions look manageable: moisture {moisture}%, temperature {temp}C, humidity {humidity}%, pH {ph}. Check leaves twice a week for spots, curling, yellowing, stem rot, or insects. Keep drainage open and tell me the crop plus symptom for a sharper treatment plan.",
+        "soil": "For {location}, confirm soil type with a simple soil test. Loamy soil is usually best for many crops, sandy soil drains quickly, and clay soil holds water longer. Your pH reading is {ph}, so avoid major correction until a lab test confirms it.",
+        "irrigation": "Your soil moisture is {moisture}%. Irrigation is usually not urgent above 55%, unless the crop is in flowering, fruiting, or the topsoil is drying fast. If it drops near 50-55%, irrigate in the morning or evening and avoid waterlogging.",
+        "fertilizer": "Use fertilizer by crop stage and soil test. With pH around {ph}, nutrients are generally available if the reading is near 6.5-7.5. Use balanced NPK early, split nitrogen during active growth, and avoid fertilizer when soil is very dry.",
+        "ph": "Your soil pH is {ph}. Most crops grow well around 6.0-7.5. Below 6.0, lime may help; above 8.0, organic matter, gypsum where suitable, and better drainage can help. Confirm with a soil lab before large treatment.",
+        "weather": "At {location}, current context shows temperature {temp}C and humidity {humidity}%. Before irrigation or spraying, check local rain and wind. Avoid spraying in strong wind, high heat, or just before rain.",
+        "market": "For selling near {location}, compare today's mandi price with storage cost, crop quality, and cash need. If price is above your target or quality may decline, sell part now and hold the rest to reduce risk.",
+        "default": "Based on your farm context at {location}: moisture {moisture}%, temperature {temp}C, humidity {humidity}%, pH {ph}. Ask about irrigation, fertilizer, soil pH, crop health, weather, or market price for a direct recommendation.",
+    },
+    "hi": {
+        "not_related": "कृपया फसल, मिट्टी, सिंचाई, उर्वरक, मौसम, कीट या बाजार भाव से जुड़ा खेती का प्रश्न पूछें।",
+        "irrigation": "मिट्टी की नमी {moisture}% है। 55% से ऊपर आम तौर पर सिंचाई तुरंत जरूरी नहीं होती, जब तक फसल फूल/फल अवस्था में न हो या ऊपर की मिट्टी जल्दी सूख रही हो। 50-55% के पास सुबह या शाम सिंचाई करें और जलभराव से बचें।",
+        "fertilizer": "उर्वरक फसल की अवस्था और मिट्टी जांच के आधार पर दें। pH {ph} के आसपास है, इसलिए 6.5-7.5 के पास पोषक तत्व सामान्यतः उपलब्ध रहते हैं। शुरुआत में संतुलित NPK दें और नाइट्रोजन को किश्तों में दें।",
+        "ph": "मिट्टी का pH {ph} है। अधिकतर फसलें 6.0-7.5 में अच्छी बढ़ती हैं। 6.0 से कम हो तो चूना मदद कर सकता है, 8.0 से अधिक हो तो जैविक पदार्थ, उचित जगह जिप्सम और जल निकास सुधारें।",
+        "weather": "{location} में तापमान {temp}C और आर्द्रता {humidity}% दिख रही है। सिंचाई या छिड़काव से पहले स्थानीय बारिश और हवा देखें। तेज हवा, ज्यादा गर्मी या बारिश से ठीक पहले छिड़काव न करें।",
+        "market": "{location} के पास बेचने से पहले आज का मंडी भाव, भंडारण खर्च और फसल की गुणवत्ता मिलाकर देखें। भाव लक्ष्य से ऊपर हो या गुणवत्ता गिर सकती हो तो कुछ हिस्सा अभी बेचना सुरक्षित है।",
+        "health": "सेंसर के अनुसार स्थिति संभालने योग्य है: नमी {moisture}%, तापमान {temp}C, आर्द्रता {humidity}%, pH {ph}। पत्तों पर धब्बे, पीलापन, मुड़ना, सड़न या कीट हफ्ते में दो बार देखें।",
+        "soil": "{location} के लिए मिट्टी जांच सबसे भरोसेमंद है। दोमट मिट्टी अधिकतर फसलों के लिए अच्छी रहती है, रेतीली मिट्टी जल्दी सूखती है और चिकनी मिट्टी पानी ज्यादा रोकती है।",
+        "monsoon": "{location} में बारिश और जल निकास के हिसाब से फसल चुनें। नमी {moisture}% और pH {ph} पर सोयाबीन, अरहर, मक्का या मूंग अच्छे विकल्प हो सकते हैं।",
+        "default": "{location} के खेत डेटा के आधार पर: नमी {moisture}%, तापमान {temp}C, आर्द्रता {humidity}%, pH {ph}। सिंचाई, खाद, pH, फसल स्वास्थ्य, मौसम या भाव के बारे में पूछें।",
+    },
+    "mr": {
+        "not_related": "कृपया पीक, माती, सिंचन, खत, हवामान, कीड किंवा बाजारभाव याबद्दल शेतीचा प्रश्न विचारा.",
+        "irrigation": "मातीतील आर्द्रता {moisture}% आहे. 55% पेक्षा जास्त असेल तर बहुतेक वेळा सिंचन तातडीचे नसते, पण फुलोरा/फळधारणा किंवा वरची माती कोरडी असल्यास लक्ष द्या.",
+        "fertilizer": "खत पिकाच्या अवस्थेनुसार आणि माती तपासणीनुसार द्या. pH {ph} असल्यास 6.5-7.5 जवळ पोषकद्रव्ये चांगली उपलब्ध राहतात. सुरुवातीला संतुलित NPK आणि नंतर नायट्रोजन हप्त्यांत द्या.",
+        "ph": "मातीचा pH {ph} आहे. बहुतेक पिकांसाठी 6.0-7.5 चांगली श्रेणी आहे. मोठा बदल करण्याआधी माती प्रयोगशाळेची चाचणी करा.",
+        "weather": "{location} येथे तापमान {temp}C आणि आर्द्रता {humidity}% आहे. सिंचन किंवा फवारणीपूर्वी स्थानिक पाऊस आणि वारा तपासा.",
+        "market": "{location} जवळ विक्री करताना आजचा बाजारभाव, साठवण खर्च आणि पिकाची गुणवत्ता तुलना करा. भाव लक्ष्यापेक्षा जास्त असल्यास काही माल विकणे सुरक्षित ठरू शकते.",
+        "health": "सेन्सरनुसार स्थिती नियंत्रणात दिसते: आर्द्रता {moisture}%, तापमान {temp}C, आर्द्रता {humidity}%, pH {ph}. पानांवरील डाग, पिवळेपणा, वाकणे किंवा कीड तपासा.",
+        "soil": "{location} साठी माती तपासणी करा. दोमट माती बहुतेक पिकांसाठी चांगली, रेतीली माती पटकन निचरा करते आणि चिकणमाती पाणी धरून ठेवते.",
+        "monsoon": "{location} मध्ये निचरा आणि पावसावरून पीक निवडा. नमी {moisture}% आणि pH {ph} असल्यास सोयाबीन, तूर, मका किंवा मूग चांगले पर्याय ठरू शकतात.",
+        "default": "{location} मधील शेत डेटा: आर्द्रता {moisture}%, तापमान {temp}C, आर्द्रता {humidity}%, pH {ph}. सिंचन, खत, pH, पीक आरोग्य, हवामान किंवा बाजारभाव विचारा.",
+    },
+    "te": {
+        "not_related": "దయచేసి పంట, మట్టి, నీరుపారుదల, ఎరువు, వాతావరణం, పురుగు లేదా మార్కెట్ ధరల గురించి వ్యవసాయ ప్రశ్న అడగండి.",
+        "irrigation": "మట్టి తేమ {moisture}% ఉంది. సాధారణంగా 55% పైగా ఉంటే వెంటనే నీరు అవసరం లేదు, కానీ పుష్పం/కాయ దశలో లేదా పై మట్టి త్వరగా ఎండితే జాగ్రత్తగా చూడండి.",
+        "fertilizer": "ఎరువును పంట దశ మరియు మట్టి పరీక్ష ఆధారంగా ఇవ్వండి. pH {ph} దగ్గరగా ఉంటే 6.5-7.5 పరిధిలో పోషకాలు బాగా అందుతాయి. మొదట సమతుల NPK, తరువాత నత్రజని విడతలుగా ఇవ్వండి.",
+        "ph": "మీ మట్టి pH {ph}. చాలా పంటలకు 6.0-7.5 సరైనది. పెద్ద మార్పులకు ముందు మట్టి పరీక్ష చేయించండి.",
+        "weather": "{location} వద్ద ఉష్ణోగ్రత {temp}C, ఆర్ద్రత {humidity}% ఉంది. నీరు లేదా స్ప్రే ముందు స్థానిక వర్షం, గాలి చూడండి.",
+        "market": "{location} దగ్గర అమ్మే ముందు ఈరోజు మార్కెట్ ధర, నిల్వ ఖర్చు, పంట నాణ్యత పోల్చండి. ధర లక్ష్యానికి మించి ఉంటే కొంత భాగం అమ్మడం మంచిది.",
+        "health": "సెన్సార్ డేటా ప్రకారం పరిస్థితి నియంత్రణలో ఉంది: తేమ {moisture}%, ఉష్ణోగ్రత {temp}C, ఆర్ద్రత {humidity}%, pH {ph}. ఆకుల మచ్చలు, పసుపు, ముడతలు లేదా పురుగులు పరిశీలించండి.",
+        "soil": "{location} కోసం మట్టి పరీక్ష ఉత్తమం. లోమీ మట్టి చాలా పంటలకు మంచిది, ఇసుక మట్టి త్వరగా నీరు వదులుతుంది, మట్టి నేల నీరు ఎక్కువగా ఉంచుతుంది.",
+        "monsoon": "{location} లో వర్షం, నీటి పారుదల బట్టి పంట ఎంచుకోండి. తేమ {moisture}% మరియు pH {ph} వద్ద సోయాబీన్, కంది, మొక్కజొన్న లేదా పెసలు మంచి ఎంపికలు కావచ్చు.",
+        "default": "{location} ఫారం డేటా: తేమ {moisture}%, ఉష్ణోగ్రత {temp}C, ఆర్ద్రత {humidity}%, pH {ph}. నీరు, ఎరువు, pH, పంట ఆరోగ్యం, వాతావరణం లేదా ధర గురించి అడగండి.",
+    },
+    "ta": {
+        "not_related": "பயிர், மண், பாசனம், உரம், வானிலை, பூச்சி அல்லது சந்தை விலை பற்றிய விவசாயக் கேள்வியை கேளுங்கள்.",
+        "irrigation": "மண் ஈரப்பதம் {moisture}% உள்ளது. 55% மேல் இருந்தால் பெரும்பாலும் உடனடி பாசனம் தேவையில்லை; ஆனால் பூக்கும்/காய்க்கும் நிலையில் அல்லது மேல் மண் விரைவாக உலர்ந்தால் கவனிக்கவும்.",
+        "fertilizer": "உரத்தை பயிர் நிலை மற்றும் மண் பரிசோதனை அடிப்படையில் கொடுங்கள். pH {ph} அருகில் இருந்தால் 6.5-7.5 வரம்பில் சத்துகள் நன்றாக கிடைக்கும்.",
+        "ph": "மண் pH {ph}. பெரும்பாலான பயிர்களுக்கு 6.0-7.5 நல்ல வரம்பு. பெரிய திருத்தத்திற்கு முன் ஆய்வக மண் பரிசோதனை செய்யுங்கள்.",
+        "weather": "{location} பகுதியில் வெப்பநிலை {temp}C, ஈரப்பதம் {humidity}% உள்ளது. பாசனம் அல்லது தெளிப்பதற்கு முன் உள்ளூர் மழை, காற்றை பாருங்கள்.",
+        "market": "{location} அருகே விற்கும்போது இன்றைய சந்தை விலை, சேமிப்பு செலவு, பயிர் தரம் ஆகியவற்றை ஒப்பிடுங்கள். விலை இலக்கத்தை மீறினால் ஒரு பகுதியை இப்போது விற்கலாம்.",
+        "health": "சென்சார் தரவுப்படி நிலை கட்டுப்பாட்டில் உள்ளது: ஈரப்பதம் {moisture}%, வெப்பநிலை {temp}C, ஈரப்பதம் {humidity}%, pH {ph}. இலை மஞ்சள், புள்ளி, சுருள் அல்லது பூச்சி பார்க்கவும்.",
+        "soil": "{location} க்கு மண் பரிசோதனை நம்பகமானது. கலிமண் பல பயிர்களுக்கு நல்லது, மணற்பாங்கான மண் விரைவாக வடிகிறது, களிமண் நீரை நீண்ட நேரம் வைத்திருக்கும்.",
+        "monsoon": "{location} இல் மழை மற்றும் வடிகால் அடிப்படையில் பயிர் தேர்வு செய்யுங்கள். ஈரப்பதம் {moisture}% மற்றும் pH {ph} எனில் சோயாபீன், துவரை, மக்காச்சோளம் அல்லது பாசிப்பயறு நல்ல தேர்வு.",
+        "default": "{location} பண்ணை தரவு: ஈரப்பதம் {moisture}%, வெப்பநிலை {temp}C, ஈரப்பதம் {humidity}%, pH {ph}. பாசனம், உரம், pH, பயிர் ஆரோக்கியம், வானிலை அல்லது விலை பற்றி கேளுங்கள்.",
+    },
+    "bn": {
+        "not_related": "দয়া করে ফসল, মাটি, সেচ, সার, আবহাওয়া, পোকা বা বাজারদর নিয়ে কৃষি প্রশ্ন করুন।",
+        "irrigation": "মাটির আর্দ্রতা {moisture}%। 55% এর বেশি হলে সাধারণত এখনই সেচ জরুরি নয়, তবে ফুল/ফল ধাপ বা উপরিভাগ দ্রুত শুকালে নজর রাখুন।",
+        "fertilizer": "সার ফসলের ধাপ ও মাটি পরীক্ষার ভিত্তিতে দিন। pH {ph} হলে 6.5-7.5 এর কাছে পুষ্টি সাধারণত ভালোভাবে মেলে। শুরুতে সুষম NPK দিন।",
+        "ph": "মাটির pH {ph}। বেশিরভাগ ফসল 6.0-7.5 এ ভালো বাড়ে। বড় সংশোধনের আগে ল্যাব মাটি পরীক্ষা করুন।",
+        "weather": "{location} এলাকায় তাপমাত্রা {temp}C এবং আর্দ্রতা {humidity}%। সেচ বা স্প্রে করার আগে স্থানীয় বৃষ্টি ও বাতাস দেখুন।",
+        "market": "{location} এর কাছে বিক্রির আগে আজকের বাজারদর, সংরক্ষণ খরচ ও ফসলের মান মিলিয়ে দেখুন। দাম লক্ষ্যের বেশি হলে কিছু অংশ এখন বিক্রি করা ঝুঁকি কমায়।",
+        "health": "সেন্সর অনুযায়ী অবস্থা সামলানো যায়: আর্দ্রতা {moisture}%, তাপমাত্রা {temp}C, আর্দ্রতা {humidity}%, pH {ph}। পাতায় দাগ, হলুদ হওয়া, কুঁকড়ে যাওয়া বা পোকা দেখুন।",
+        "soil": "{location} এর জন্য মাটি পরীক্ষা সবচেয়ে নির্ভরযোগ্য। দোআঁশ মাটি অনেক ফসলের জন্য ভালো, বেলে মাটি দ্রুত শুকায়, কাদা মাটি জল ধরে রাখে।",
+        "monsoon": "{location} এ বৃষ্টি ও নিকাশির উপর ফসল বেছে নিন। আর্দ্রতা {moisture}% এবং pH {ph} হলে সয়াবিন, অড়হর, ভুট্টা বা মুগ ভালো হতে পারে।",
+        "default": "{location} খামার ডেটা: আর্দ্রতা {moisture}%, তাপমাত্রা {temp}C, আর্দ্রতা {humidity}%, pH {ph}। সেচ, সার, pH, ফসলের স্বাস্থ্য, আবহাওয়া বা দাম জিজ্ঞেস করুন।",
+    },
+    "kn": {
+        "not_related": "ದಯವಿಟ್ಟು ಬೆಳೆ, ಮಣ್ಣು, ನೀರಾವರಿ, ಗೊಬ್ಬರ, ಹವಾಮಾನ, ಕೀಟ ಅಥವಾ ಮಾರುಕಟ್ಟೆ ಬೆಲೆ ಕುರಿತು ಕೃಷಿ ಪ್ರಶ್ನೆ ಕೇಳಿ.",
+        "irrigation": "ಮಣ್ಣಿನ ತೇವಾಂಶ {moisture}% ಇದೆ. 55% ಕ್ಕಿಂತ ಹೆಚ್ಚು ಇದ್ದರೆ ಸಾಮಾನ್ಯವಾಗಿ ತಕ್ಷಣ ನೀರಾವರಿ ಅಗತ್ಯವಿಲ್ಲ; ಆದರೆ ಹೂ/ಹಣ್ಣು ಹಂತದಲ್ಲಿದ್ದರೆ ಅಥವಾ ಮೇಲ್ಮಣ್ಣು ಬೇಗ ಒಣಗಿದರೆ ಗಮನಿಸಿ.",
+        "fertilizer": "ಗೊಬ್ಬರವನ್ನು ಬೆಳೆ ಹಂತ ಮತ್ತು ಮಣ್ಣು ಪರೀಕ್ಷೆಯ ಆಧಾರದಲ್ಲಿ ಕೊಡಿ. pH {ph} ಇದ್ದರೆ 6.5-7.5 ಹತ್ತಿರ ಪೋಷಕಾಂಶಗಳು ಚೆನ್ನಾಗಿ ಲಭ್ಯವಾಗುತ್ತವೆ.",
+        "ph": "ಮಣ್ಣಿನ pH {ph}. ಹೆಚ್ಚಿನ ಬೆಳೆಗಳಿಗೆ 6.0-7.5 ಉತ್ತಮ. ದೊಡ್ಡ ತಿದ್ದುಪಡಿ ಮಾಡುವ ಮೊದಲು ಪ್ರಯೋಗಾಲಯ ಮಣ್ಣು ಪರೀಕ್ಷೆ ಮಾಡಿ.",
+        "weather": "{location} ನಲ್ಲಿ ತಾಪಮಾನ {temp}C ಮತ್ತು ಆರ್ದ್ರತೆ {humidity}% ಇದೆ. ನೀರಾವರಿ ಅಥವಾ ಸಿಂಪಡಣೆಗೆ ಮೊದಲು ಸ್ಥಳೀಯ ಮಳೆ ಮತ್ತು ಗಾಳಿಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "market": "{location} ಹತ್ತಿರ ಮಾರಾಟ ಮಾಡುವ ಮೊದಲು ಇಂದಿನ ಮಾರುಕಟ್ಟೆ ಬೆಲೆ, ಸಂಗ್ರಹ ವೆಚ್ಚ ಮತ್ತು ಬೆಳೆ ಗುಣಮಟ್ಟ ಹೋಲಿಸಿ. ಗುರಿಗಿಂತ ಬೆಲೆ ಮೇಲಾಗಿದ್ದರೆ ಕೆಲವಷ್ಟು ಈಗ ಮಾರಾಟ ಮಾಡಬಹುದು.",
+        "health": "ಸೆನ್ಸಾರ್ ಡೇಟಾ ಪ್ರಕಾರ ಸ್ಥಿತಿ ನಿಯಂತ್ರಣದಲ್ಲಿದೆ: ತೇವಾಂಶ {moisture}%, ತಾಪಮಾನ {temp}C, ಆರ್ದ್ರತೆ {humidity}%, pH {ph}. ಎಲೆಯ ಕಲೆ, ಹಳದಿ, ಮಡಚು ಅಥವಾ ಕೀಟ ಪರಿಶೀಲಿಸಿ.",
+        "soil": "{location} ಗೆ ಮಣ್ಣು ಪರೀಕ್ಷೆ ವಿಶ್ವಾಸಾರ್ಹ. ಲೋಮಿ ಮಣ್ಣು ಹಲವು ಬೆಳೆಗಳಿಗೆ ಉತ್ತಮ, ಮರಳು ಮಣ್ಣು ಬೇಗ ನೀರು ಬಿಡುತ್ತದೆ, ಮಣ್ಣುಗಡ್ಡೆ ನೀರನ್ನು ಹೆಚ್ಚು ಹಿಡಿದಿಡುತ್ತದೆ.",
+        "monsoon": "{location} ನಲ್ಲಿ ಮಳೆ ಮತ್ತು ನೀರು ಹೊರಹೋಗುವಿಕೆಯ ಆಧಾರದಲ್ಲಿ ಬೆಳೆ ಆರಿಸಿ. ತೇವಾಂಶ {moisture}% ಮತ್ತು pH {ph} ಇದ್ದರೆ ಸೋಯಾಬೀನ್, ತೊಗರಿ, ಮೆಕ್ಕೆಜೋಳ ಅಥವಾ ಹೆಸರು ಉತ್ತಮ ಆಯ್ಕೆಗಳು.",
+        "default": "{location} ಜಮೀನಿನ ಡೇಟಾ: ತೇವಾಂಶ {moisture}%, ತಾಪಮಾನ {temp}C, ಆರ್ದ್ರತೆ {humidity}%, pH {ph}. ನೀರಾವರಿ, ಗೊಬ್ಬರ, pH, ಬೆಳೆ ಆರೋಗ್ಯ, ಹವಾಮಾನ ಅಥವಾ ಬೆಲೆ ಕೇಳಿ.",
+    },
 }
 
 app = FastAPI(title="CropConnect ESP32 Ingestion API", version="1.0.0")
@@ -652,7 +826,10 @@ def is_plant_or_soil_question(message: str) -> bool:
     if words & PLANT_SOIL_TERMS:
         return True
 
-    return any(term in normalized for term in PLANT_SOIL_TERMS if len(term) > 4)
+    if any(term in normalized for term in PLANT_SOIL_TERMS if len(term) > 4):
+        return True
+
+    return any(term in normalized for term in MULTILINGUAL_PLANT_SOIL_TERMS)
 
 
 def sensor_value(payload: ChatIn, *keys: str, default: Any = "unknown") -> Any:
@@ -663,78 +840,50 @@ def sensor_value(payload: ChatIn, *keys: str, default: Any = "unknown") -> Any:
     return default
 
 
+def selected_language(payload: ChatIn) -> str:
+    code = (payload.language or "en").lower().split("-", 1)[0]
+    return code if code in CHAT_REPLY_TEMPLATES else "en"
+
+
+def localized_chat_reply(payload: ChatIn, reply_key: str) -> str:
+    lang = selected_language(payload)
+    template = CHAT_REPLY_TEMPLATES.get(lang, CHAT_REPLY_TEMPLATES["en"]).get(
+        reply_key,
+        CHAT_REPLY_TEMPLATES.get(lang, CHAT_REPLY_TEMPLATES["en"])["default"],
+    )
+    return template.format(
+        moisture=sensor_value(payload, "soilMoisture", "soil_moisture"),
+        temp=sensor_value(payload, "temperature"),
+        humidity=sensor_value(payload, "humidity"),
+        ph=sensor_value(payload, "soilPh", "ph"),
+        location=payload.location or "your farm",
+    )
+
+
+def message_has_any(message: str, *terms: str) -> bool:
+    return any(term in message for term in terms)
+
+
 def local_ai_reply(payload: ChatIn) -> str:
     message = payload.message.lower()
-    moisture = sensor_value(payload, "soilMoisture", "soil_moisture")
-    temp = sensor_value(payload, "temperature")
-    humidity = sensor_value(payload, "humidity")
-    ph = sensor_value(payload, "soilPh", "ph")
-    location = payload.location or "your farm"
+    if message_has_any(message, "monsoon", "kharif", "crop", "grow", "fasal", "pika", "फसल", "पीक", "పంట", "பயிர்", "ফসল", "ಬೆಳೆ"):
+        return localized_chat_reply(payload, "monsoon")
+    if message_has_any(message, "health", "disease", "pest", "कीट", "रोग", "आरोग्य", "పురుగు", "రోగ", "நோய்", "পোকা", "রোগ", "ಕೀಟ", "ರೋಗ"):
+        return localized_chat_reply(payload, "health")
+    if message_has_any(message, "soil type", "soil", "mitti", "mati", "मिट्टी", "माती", "మట్టి", "மண்", "মাটি", "ಮಣ್ಣು"):
+        return localized_chat_reply(payload, "soil")
+    if message_has_any(message, "irrigat", "water", "watering", "moisture", "pani", "paani", "sinchai", "पानी", "सिंचाई", "पाणी", "सिंचन", "నీరు", "సాగు", "நீர்", "பாசனம்", "সেচ", "ನೀರು", "ನೀರಾವರಿ"):
+        return localized_chat_reply(payload, "irrigation")
+    if message_has_any(message, "fertilizer", "fertiliser", "npk", "nutrient", "khad", "khaad", "उर्वरक", "खाद", "खत", "ఎరువు", "உரம்", "সার", "ಗೊಬ್ಬರ"):
+        return localized_chat_reply(payload, "fertilizer")
+    if "ph" in message or "पीएच" in message:
+        return localized_chat_reply(payload, "ph")
+    if message_has_any(message, "weather", "rain", "temperature", "mausam", "barish", "baarish", "मौसम", "बारिश", "हवामान", "पाऊस", "వాతావరణం", "వర్షం", "வானிலை", "மழை", "আবহাওয়া", "বৃষ্টি", "ಹವಾಮಾನ", "ಮಳೆ"):
+        return localized_chat_reply(payload, "weather")
+    if message_has_any(message, "market", "price", "sell", "mandi", "bhav", "bazar", "मंडी", "भाव", "बेच", "बाजार", "ధర", "అమ్మ", "விலை", "விற்க", "দাম", "বিক্রি", "ಬೆಲೆ", "ಮಾರುಕಟ್ಟೆ"):
+        return localized_chat_reply(payload, "market")
 
-    if "monsoon" in message or "kharif" in message or ("crop" in message and ("plant" in message or "grow" in message)):
-        return (
-            f"For the monsoon season near {location}, good practical crop choices are soybean, maize, pigeon pea/tur dal, "
-            "groundnut, green gram, black gram, and vegetables like okra or chilli if you can manage drainage. "
-            f"With your current soil moisture around {moisture}% and pH {ph}, soybean or pigeon pea are strong safer choices "
-            "for medium black soil; maize works well if you can give nutrients and avoid waterlogging. "
-            "If your field holds water for many days, avoid groundnut and choose pigeon pea or paddy only if water is reliable. "
-            "Final choice should depend on seed availability, last crop, market price, and whether the field drains within 24-48 hours after heavy rain."
-        )
-
-    if "crop health" in message or "plant health" in message or "disease" in message or "pest" in message:
-        return (
-            f"Crop health looks generally okay from sensors: moisture {moisture}%, temperature {temp}C, humidity {humidity}%, "
-            f"and pH {ph}. The main risk is high humidity, which can increase fungal disease pressure in monsoon. "
-            "Check leaves twice a week for yellowing, curling, spots, powdery growth, stem rot, and insects under the leaves. "
-            "Keep drainage open, avoid watering late evening, remove badly infected leaves, and use a recommended fungicide or pesticide only after identifying the symptom. "
-            "If you tell me the crop name and symptom, I can give a more specific action."
-        )
-
-    if "soil type" in message or ("soil" in message and ("popular" in message or "common" in message)):
-        return (
-            "The most common farm soil type depends on the region, but for many Indian farms, alluvial soil is widely used "
-            "because it is fertile and supports crops like wheat, rice, sugarcane, pulses, and vegetables. "
-            f"For {location}, do a simple field check too: sandy soil drains fast, clay soil holds water longer, and loamy soil "
-            "usually gives the best balance for most crops. A soil test is the safest way to confirm your exact type."
-        )
-
-    if "irrigat" in message or "water" in message or "moisture" in message:
-        return (
-            f"Your current soil moisture is {moisture}%. If this is accurate, irrigation is not urgent unless the crop is in a "
-            "water-sensitive stage or the topsoil is drying quickly. For many field crops, consider irrigation when moisture "
-            "moves below about 50-55%, and avoid watering during strong afternoon heat."
-        )
-
-    if "fertilizer" in message or "npk" in message or "nutrient" in message:
-        return (
-            f"Use fertilizer based on crop stage and a soil test. With pH around {ph}, most nutrients should remain available "
-            "if the value is near 6.5-7.5. For wheat or vegetables, a balanced NPK dose is usually safer early, then add "
-            "nitrogen in split doses during active growth. Avoid over-fertilizing when soil moisture is low."
-        )
-
-    if "ph" in message:
-        return (
-            f"Your soil pH reading is {ph}. Most crops prefer about 6.0-7.5. If pH is below 6.0, lime can help; if it is above "
-            "8.0, organic matter, gypsum where suitable, and better drainage can help. Confirm with a soil lab before major correction."
-        )
-
-    if "weather" in message or "rain" in message or "temperature" in message:
-        return (
-            f"Current farm context shows temperature {temp}C and humidity {humidity}% at {location}. Before irrigation or spraying, "
-            "check the latest local forecast. Avoid spraying in strong wind, high heat, or just before rain."
-        )
-
-    if "market" in message or "price" in message or "sell" in message:
-        return (
-            f"For market decisions near {location}, compare today's mandi price with your storage cost and crop condition. "
-            "If prices are above your target and quality may drop in storage, selling part of the harvest now can reduce risk."
-        )
-
-    return (
-        f"Based on your farm context at {location}: soil moisture {moisture}%, temperature {temp}C, humidity {humidity}%, "
-        f"and pH {ph}. Ask me about irrigation, fertilizer, soil pH, crop health, weather timing, or market prices and I can "
-        "give a practical recommendation from this data."
-    )
+    return localized_chat_reply(payload, "default")
 
 
 def local_ai_unavailable_reply(payload: ChatIn) -> str:
@@ -1507,15 +1656,7 @@ def enquiries(payload: EnquiryIn):
 
 @app.post("/api/ai/chat")
 def ai_chat(payload: ChatIn):
-    if not is_plant_or_soil_question(payload.message):
-        reply = "Please enter a correct question related to plant or soil."
-        insert_chat_record(payload.user_id, payload.email, "user", payload.message, False, payload.sensor_data, payload.location)
-        insert_chat_record(payload.user_id, payload.email, "bot", reply, False, payload.sensor_data, payload.location)
-        return {
-            "ok": False,
-            "related_to_plant_or_soil": False,
-            "reply": reply,
-        }
+    related_to_plant_or_soil = is_plant_or_soil_question(payload.message)
 
     context = {
         "location": payload.location,
@@ -1530,7 +1671,7 @@ def ai_chat(payload: ChatIn):
         insert_chat_record(payload.user_id, payload.email, "bot", reply, True, payload.sensor_data, payload.location)
         return {
             "ok": True,
-            "related_to_plant_or_soil": True,
+            "related_to_plant_or_soil": related_to_plant_or_soil,
             "reply": reply,
             "needs_setup": ["OPENAI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_CSE_ID"],
         }
@@ -1540,22 +1681,23 @@ def ai_chat(payload: ChatIn):
             "role": "developer",
             "content": (
                 "You are CropConnect's farming assistant. Give concise, practical crop, irrigation, "
-                "weather, market, and sensor guidance. Use the supplied farm context. If a question "
-                "needs certified agronomy, veterinary, legal, medical, or financial advice, say so clearly. "
+                "weather, market, and sensor guidance. Use simple language, short paragraphs, and clear next steps. "
+                "Prefer 2-4 actionable points over long explanations. Use the supplied farm context and sensor values. "
+                "If a question needs certified agronomy, veterinary, legal, medical, or financial advice, say so clearly. "
                 "When web search results are supplied, use them as supporting context and mention that the "
                 "answer is based on the available search snippets, not direct Google pages. "
-                "Always answer in the user's selected language (payload.language) only. "
+                "Always answer in the user's selected language (" + LANGUAGE_NAMES.get(selected_language(payload), payload.language) + ") only. "
                 "If the user's spoken or typed message is in another language, understand it, "
                 "but reply only in the selected language, not in the input language."
             ),
         },
-        {"role": "user", "content": f"Farm context: {json.dumps(context, ensure_ascii=False)}"},
+        {"role": "user", "content": "Farm context: " + str(context)},
     ]
     if search_results:
         messages.append(
             {
                 "role": "user",
-                "content": f"Google search context: {json.dumps(search_results, ensure_ascii=False)}",
+                "content": "Google search context: " + str(search_results),
             }
         )
     for item in payload.history[-8:]:
@@ -1563,7 +1705,7 @@ def ai_chat(payload: ChatIn):
         text = item.get("text", "")
         if text:
             messages.append({"role": role, "content": text})
-    messages.append({"role": "user", "content": f"Desired reply language: {payload.language}. Input language: {payload.input_language}. {payload.message}"})
+    messages.append({"role": "user", "content": "Desired reply language: " + LANGUAGE_NAMES.get(selected_language(payload), payload.language) + ". Input language: " + payload.input_language + ". " + payload.message})
 
     try:
         data = request_json(
@@ -1582,7 +1724,7 @@ def ai_chat(payload: ChatIn):
         insert_chat_record(payload.user_id, payload.email, "bot", reply, True, payload.sensor_data, payload.location)
         return {
             "ok": True,
-            "related_to_plant_or_soil": True,
+            "related_to_plant_or_soil": related_to_plant_or_soil,
             "reply": reply,
             "needs_setup": ["OPENAI_API_KEY quota/billing"],
             "used_google_search": bool(search_results),
@@ -1594,7 +1736,7 @@ def ai_chat(payload: ChatIn):
     insert_chat_record(payload.user_id, payload.email, "bot", final_reply, True, payload.sensor_data, payload.location)
     return {
         "ok": True,
-        "related_to_plant_or_soil": True,
+        "related_to_plant_or_soil": related_to_plant_or_soil,
         "reply": final_reply,
         "used_google_search": bool(search_results),
     }
