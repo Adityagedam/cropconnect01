@@ -155,17 +155,52 @@ curl -X POST "https://cropconnect01-production.up.railway.app/api/pump/state" \
 
 The ESP32 will receive the command on its next poll (every 3 seconds) and turn the motor on/off accordingly.
 
-Flash this sketch to the ESP32:
+## ESP32 Setup Instructions
+
+Complete setup instructions are available in:
 
 ```text
-cropconnect-backend/esp32_pump_controller/esp32_pump_controller.ino
+cropconnect-backend/esp32_pump_controller/README.md
+```
+
+### Quick Setup
+
+1. **Download the ESP32 code**:
+   ```text
+   cropconnect-backend/esp32_pump_controller/esp32_pump_controller_complete.ino
+   ```
+
+2. **Update WiFi credentials** in the code:
+   ```cpp
+   const char* WIFI_SSID = "YOUR_WIFI_SSID";
+   const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+   ```
+
+3. **Install Arduino IDE** and ESP32 board support
+
+4. **Upload the code** to your ESP32 board
+
+5. **Monitor Serial output** at 115200 baud to verify connection
+
+### Hardware Connections
+
+- **ESP32 GPIO pins**: 19, 18, 5, 17, 32, 33, 25, 14 (for 8 relays)
+- **Relay module**: Connect to 5V/GND and control pins
+- **Pumps/Motors**: Connect through relay module NO terminals
+
+### Testing
+
+Use the test script to verify ESP32 functionality:
+
+```bash
+python esp32_pump_controller/test_esp32.py
 ```
 
 Before flashing, edit:
 
 ```cpp
-const char* WIFI_SSID = "motorola edge 20 fusion_2684";
-const char* WIFI_PASSWORD = "12345678";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* API_KEY = "dev-secret-key";
 ```
 
