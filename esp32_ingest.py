@@ -14,9 +14,10 @@ import mysql.connector
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from pump_control import router as pump_router
+from pump_control import relay_command_text, router as pump_router, update_relay_command_state
 
 
 load_dotenv()
@@ -48,6 +49,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = env("OPENAI_MODEL", "gpt-4o-mini")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID", "")
+RELAY_COMMANDS_LOADED_FROM_DB = False
 
 PLANT_SOIL_TERMS = {
     "agriculture",
@@ -819,6 +821,29 @@ def esp32_payload_to_telemetry(data: dict[str, Any]) -> TelemetryIn:
     )
 
 
+def sync_relay_commands_from_db() -> None:
+    query = """
+        SELECT ps.pump_id, ps.is_on
+        FROM pump_states ps
+        INNER JOIN (
+          SELECT pump_id, MAX(id) AS latest_id
+          FROM pump_states
+          GROUP BY pump_id
+        ) latest ON ps.id = latest.latest_id
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor(dictionary=True) as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+    except Exception:
+        return
+
+    for row in rows:
+        update_relay_command_state(str(row["pump_id"]), bool(row["is_on"]))
+
+
 @app.get("/api/health")
 def health():
     try:
@@ -837,7 +862,22 @@ def root():
         "service": "CropConnect ESP32 Ingestion API",
         "docs": "/docs",
         "health": "/api/health",
+        "esp32_relay_command": "/api/esp32/relay-command",
     }
+
+
+@app.get("/api/esp32/relay-command", response_class=PlainTextResponse)
+def esp32_relay_command():
+    global RELAY_COMMANDS_LOADED_FROM_DB
+    if not RELAY_COMMANDS_LOADED_FROM_DB:
+        sync_relay_commands_from_db()
+        RELAY_COMMANDS_LOADED_FROM_DB = True
+    return relay_command_text()
+
+
+@app.get("/esp32/relay-command", response_class=PlainTextResponse)
+def esp32_relay_command_short():
+    return esp32_relay_command()
 
 
 @app.post("/api/telemetry/ingest")
@@ -1140,6 +1180,8 @@ def save_pump_state(payload: PumpStateSaveIn):
             conn.commit()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Could not save pump state: {exc}") from exc
+
+    update_relay_command_state(payload.pump_id, payload.on)
 
     return {"ok": True}
 

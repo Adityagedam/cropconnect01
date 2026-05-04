@@ -27,9 +27,9 @@ export MYSQL_USER=root
 export MYSQL_PASSWORD=Rudra@123
 export MYSQL_DATABASE=cropconnect
 export ESP32_API_KEY=dev-secret-key
-export ESP32_PUMP_BASE_URL=http://YOUR_ESP32_IP
+export ESP32_PUMP_COMMAND_MODE=poll
+export ESP32_PUMP_BASE_URL=
 export ESP32_PUMP_API_KEY=dev-secret-key
-export ESP32_PUMP_COMMAND_MODE=json
 export CONTACT_TO_EMAIL=cropconnectco@gmail.com
 export OPENAI_API_KEY=your_openai_key
 export OPENAI_MODEL=gpt-4o-mini
@@ -81,6 +81,34 @@ GET http://localhost:8001/api/sensors/latest?device_id=sim-node-1
 ```
 
 ## ESP32 WiFi Pump Control
+
+For Railway production, use polling mode. The website posts pump changes to:
+
+```text
+POST https://cropconnect01-production.up.railway.app/api/pump/state
+```
+
+The ESP32 should poll:
+
+```text
+GET https://cropconnect01-production.up.railway.app/api/esp32/relay-command
+```
+
+That endpoint returns plain text for 8 relays:
+
+```text
+1on 2off 3off 4off 5off 6off 7off 8off
+```
+
+In your sketch, set:
+
+```cpp
+const char* serverURL = "https://cropconnect01-production.up.railway.app/api/esp32/relay-command";
+```
+
+`HTTPClient` needs the `https://` protocol and the `/api/esp32/relay-command` path.
+
+## ESP32 Direct WiFi Pump Control
 
 Flash this sketch to the ESP32:
 

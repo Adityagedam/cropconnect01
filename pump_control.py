@@ -19,7 +19,8 @@ def env(name: str, default: str = "") -> str:
 
 ESP32_PUMP_BASE_URL = env("ESP32_PUMP_BASE_URL").rstrip("/")
 ESP32_PUMP_API_KEY = env("ESP32_PUMP_API_KEY", env("ESP32_API_KEY", "dev-secret-key"))
-ESP32_PUMP_COMMAND_MODE = env("ESP32_PUMP_COMMAND_MODE", "json").lower()
+ESP32_PUMP_COMMAND_MODE = env("ESP32_PUMP_COMMAND_MODE", "poll").lower()
+RELAY_COMMAND_STATE: dict[int, bool] = {index: False for index in range(1, 9)}
 
 
 class PumpStateIn(BaseModel):
@@ -30,6 +31,23 @@ class PumpStateIn(BaseModel):
 def pump_number(pump_id: str) -> str:
     digits = "".join(ch for ch in pump_id if ch.isdigit())
     return digits or pump_id
+
+
+def update_relay_command_state(pump_id: str, on: bool) -> None:
+    try:
+        relay_number = int(pump_number(pump_id))
+    except ValueError:
+        return
+
+    if 1 <= relay_number <= 8:
+        RELAY_COMMAND_STATE[relay_number] = on
+
+
+def relay_command_text() -> str:
+    return " ".join(
+        f"{relay_number}{'on' if RELAY_COMMAND_STATE[relay_number] else 'off'}"
+        for relay_number in range(1, 9)
+    )
 
 
 def build_esp32_request(payload: PumpStateIn) -> urllib.request.Request:
@@ -60,10 +78,12 @@ def build_esp32_request(payload: PumpStateIn) -> urllib.request.Request:
 
 
 def send_pump_signal(payload: PumpStateIn) -> dict[str, Any]:
-    if not ESP32_PUMP_BASE_URL:
+    update_relay_command_state(payload.pump_id, payload.on)
+
+    if ESP32_PUMP_COMMAND_MODE == "poll" or not ESP32_PUMP_BASE_URL:
         return {
             "sent": False,
-            "message": "ESP32_PUMP_BASE_URL is not configured; frontend state was updated only.",
+            "message": "Pump command queued for ESP32 polling.",
         }
 
     request = build_esp32_request(payload)
