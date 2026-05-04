@@ -167,6 +167,7 @@ class ChatIn(BaseModel):
     email: str | None = Field(default=None, max_length=255)
     message: str = Field(min_length=1, max_length=2000)
     language: str = Field(default="en", max_length=16)
+    input_language: str = Field(default="en", max_length=16)
     sensor_data: dict[str, Any] = Field(default_factory=dict)
     location: str | None = Field(default="", max_length=160)
     history: list[dict[str, str]] = Field(default_factory=list, max_length=12)
@@ -1542,7 +1543,10 @@ def ai_chat(payload: ChatIn):
                 "weather, market, and sensor guidance. Use the supplied farm context. If a question "
                 "needs certified agronomy, veterinary, legal, medical, or financial advice, say so clearly. "
                 "When web search results are supplied, use them as supporting context and mention that the "
-                "answer is based on the available search snippets, not direct Google pages."
+                "answer is based on the available search snippets, not direct Google pages. "
+                "Always answer in the user's selected language (payload.language) only. "
+                "If the user's spoken or typed message is in another language, understand it, "
+                "but reply only in the selected language, not in the input language."
             ),
         },
         {"role": "user", "content": f"Farm context: {json.dumps(context, ensure_ascii=False)}"},
@@ -1559,7 +1563,7 @@ def ai_chat(payload: ChatIn):
         text = item.get("text", "")
         if text:
             messages.append({"role": role, "content": text})
-    messages.append({"role": "user", "content": payload.message})
+    messages.append({"role": "user", "content": f"Desired reply language: {payload.language}. Input language: {payload.input_language}. {payload.message}"})
 
     try:
         data = request_json(
