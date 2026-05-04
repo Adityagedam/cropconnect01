@@ -481,6 +481,8 @@ const alertSensorMeta = {
   soilPh: { label: "Soil pH", unit: "", icon: Sprout },
 };
 
+const ALERT_TOAST_INTERVAL_MS = 60000;
+
 const normalizeCropName = (value = "") =>
   value
     .toLowerCase()
@@ -653,6 +655,8 @@ export default function Dashboard() {
   const chatContainerRef = useRef(null);
   const timerControlledPumpsRef = useRef({});
   const pumpsRef = useRef(pumps);
+  const activeSensorAlertsRef = useRef([]);
+  const alertToastIntervalRef = useRef(null);
   const persistedFarmLoadedRef = useRef(false);
   const snapshotSaveInFlightRef = useRef(false);
   const isDark = theme === "dark";
@@ -798,14 +802,32 @@ export default function Dashboard() {
   }, [pumps]);
 
   useEffect(() => {
-    activeSensorAlerts.slice(0, 3).forEach((alert) => {
-      toast.warning(alert.title, {
-        description: alert.body,
-        id: alert.id,
-        duration: 5000,
-      });
-    });
+    activeSensorAlertsRef.current = activeSensorAlerts;
   }, [activeSensorAlerts]);
+
+  useEffect(() => {
+    const sendAlertToasts = () => {
+      const alerts = activeSensorAlertsRef.current;
+      if (!alerts.length) return;
+
+      alerts.slice(0, 3).forEach((alert) => {
+        toast.warning(alert.title, {
+          description: alert.body,
+          id: `${alert.id}-${Math.floor(Date.now() / ALERT_TOAST_INTERVAL_MS)}`,
+          duration: 8000,
+        });
+      });
+    };
+
+    alertToastIntervalRef.current = window.setInterval(sendAlertToasts, ALERT_TOAST_INTERVAL_MS);
+
+    return () => {
+      if (alertToastIntervalRef.current) {
+        window.clearInterval(alertToastIntervalRef.current);
+        alertToastIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // Load user data from localStorage
   useEffect(() => {
