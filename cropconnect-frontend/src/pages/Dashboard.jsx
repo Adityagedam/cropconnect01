@@ -773,21 +773,39 @@ export default function Dashboard() {
   }, []);
 
   const applyBackendReadings = useCallback((payload) => {
-    const readings = payload?.readings || [];
+    const readings = Array.isArray(payload?.readings) ? payload.readings : [];
     if (!readings.length) return false;
 
-    const byType = Object.fromEntries(
-      readings.map((reading) => [reading.sensor_type, Number(reading.value)])
-    );
+    const byType = readings.reduce((acc, reading) => {
+      if (!reading || typeof reading.sensor_type !== "string") return acc;
+      const value = Number(reading.value);
+      if (!Number.isNaN(value)) {
+        acc[reading.sensor_type] = value;
+      }
+      return acc;
+    }, {});
+
+    const updatedData = {
+      soilMoisture: Number.isFinite(byType.soil_moisture) ? Math.round(byType.soil_moisture) : null,
+      temperature: Number.isFinite(byType.temperature) ? Number(byType.temperature.toFixed(1)) : null,
+      humidity: Number.isFinite(byType.humidity) ? Math.round(byType.humidity) : null,
+      soilPh: Number.isFinite(byType.ph) ? Number(byType.ph.toFixed(1)) : null,
+      nitrogen: Number.isFinite(byType.nitrogen) ? Number(byType.nitrogen.toFixed(1)) : null,
+      phosphorus: Number.isFinite(byType.phosphorus) ? Number(byType.phosphorus.toFixed(1)) : null,
+      potassium: Number.isFinite(byType.potassium) ? Number(byType.potassium.toFixed(1)) : null,
+    };
+
+    const hasValidValue = Object.values(updatedData).some((value) => value !== null);
+    if (!hasValidValue) return false;
 
     setSensorData((prev) => ({
-      soilMoisture: Number.isFinite(byType.soil_moisture) ? Math.round(byType.soil_moisture) : prev.soilMoisture,
-      temperature: Number.isFinite(byType.temperature) ? Number(byType.temperature.toFixed(1)) : prev.temperature,
-      humidity: Number.isFinite(byType.humidity) ? Math.round(byType.humidity) : prev.humidity,
-      soilPh: Number.isFinite(byType.ph) ? Number(byType.ph.toFixed(1)) : prev.soilPh,
-      nitrogen: Number.isFinite(byType.nitrogen) ? Number(byType.nitrogen.toFixed(1)) : prev.nitrogen,
-      phosphorus: Number.isFinite(byType.phosphorus) ? Number(byType.phosphorus.toFixed(1)) : prev.phosphorus,
-      potassium: Number.isFinite(byType.potassium) ? Number(byType.potassium.toFixed(1)) : prev.potassium,
+      soilMoisture: updatedData.soilMoisture ?? prev.soilMoisture,
+      temperature: updatedData.temperature ?? prev.temperature,
+      humidity: updatedData.humidity ?? prev.humidity,
+      soilPh: updatedData.soilPh ?? prev.soilPh,
+      nitrogen: updatedData.nitrogen ?? prev.nitrogen,
+      phosphorus: updatedData.phosphorus ?? prev.phosphorus,
+      potassium: updatedData.potassium ?? prev.potassium,
     }));
 
     setSensorConnection({
@@ -1969,6 +1987,20 @@ export default function Dashboard() {
       case "sensors":
         return (
           <div className="space-y-6">
+            <div className="p-4 rounded-xl border border-[#d5d1c5] bg-[#f7f5ef] shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: colors.textDark }}>Sensor connection</p>
+                  <p className="text-xs text-slate-600">Device: <span className="font-mono">{sensorConnection.deviceId}</span></p>
+                  <p className="text-xs text-slate-600">Status: <span className="font-semibold">{sensorConnection.source === "esp32" ? "ESP32 Live" : "Simulation"}</span></p>
+                  {sensorConnection.error ? <p className="text-xs text-amber-800 mt-1">{sensorConnection.error}</p> : null}
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-600">Last seen</p>
+                  <p className="text-sm font-medium" style={{ color: colors.textDark }}>{sensorConnection.lastSeen ? new Date(sensorConnection.lastSeen).toLocaleTimeString() : "No packet yet"}</p>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <SensorCard icon={Droplets} title="Soil Moisture" value={sensorData.soilMoisture} unit="%" color="green" min="0%" max="100%" barValue={sensorData.soilMoisture} />
               <SensorCard icon={CloudSun} title="Temperature" value={sensorData.temperature} unit="°C" color="orange" min="10°C" max="45°C" barValue={((sensorData.temperature - 10) / 35) * 100} />
