@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Leaf,
@@ -411,6 +411,94 @@ const initialSensorData = {
   potassium: 31,
 };
 
+const defaultCropSensorRange = {
+  label: "General crop",
+  soilMoisture: [50, 75],
+  temperature: [18, 32],
+  humidity: [45, 80],
+  soilPh: [6.0, 7.5],
+};
+
+const cropSensorRanges = {
+  wheat: { label: "Wheat", soilMoisture: [45, 70], temperature: [15, 28], humidity: [40, 70], soilPh: [6.0, 7.5] },
+  rice: { label: "Rice", soilMoisture: [70, 95], temperature: [22, 34], humidity: [60, 90], soilPh: [5.5, 7.0] },
+  paddy: { label: "Paddy", soilMoisture: [70, 95], temperature: [22, 34], humidity: [60, 90], soilPh: [5.5, 7.0] },
+  maize: { label: "Maize", soilMoisture: [50, 75], temperature: [18, 32], humidity: [45, 75], soilPh: [5.8, 7.5] },
+  corn: { label: "Corn", soilMoisture: [50, 75], temperature: [18, 32], humidity: [45, 75], soilPh: [5.8, 7.5] },
+  soybean: { label: "Soybean", soilMoisture: [50, 75], temperature: [20, 32], humidity: [45, 80], soilPh: [6.0, 7.2] },
+  cotton: { label: "Cotton", soilMoisture: [45, 70], temperature: [21, 35], humidity: [40, 75], soilPh: [6.0, 8.0] },
+  sugarcane: { label: "Sugarcane", soilMoisture: [60, 85], temperature: [20, 35], humidity: [55, 85], soilPh: [6.0, 8.0] },
+  onion: { label: "Onion", soilMoisture: [55, 75], temperature: [13, 30], humidity: [45, 70], soilPh: [6.0, 7.5] },
+  tomato: { label: "Tomato", soilMoisture: [55, 80], temperature: [18, 30], humidity: [50, 80], soilPh: [6.0, 7.0] },
+  potato: { label: "Potato", soilMoisture: [55, 80], temperature: [15, 25], humidity: [60, 85], soilPh: [5.5, 6.8] },
+  chilli: { label: "Chilli", soilMoisture: [50, 75], temperature: [20, 32], humidity: [45, 75], soilPh: [6.0, 7.0] },
+  pepper: { label: "Pepper", soilMoisture: [55, 80], temperature: [20, 32], humidity: [60, 85], soilPh: [5.5, 7.0] },
+  brinjal: { label: "Brinjal", soilMoisture: [55, 80], temperature: [20, 32], humidity: [50, 80], soilPh: [5.5, 7.0] },
+  eggplant: { label: "Eggplant", soilMoisture: [55, 80], temperature: [20, 32], humidity: [50, 80], soilPh: [5.5, 7.0] },
+  cabbage: { label: "Cabbage", soilMoisture: [55, 80], temperature: [15, 25], humidity: [55, 85], soilPh: [6.0, 7.5] },
+  cauliflower: { label: "Cauliflower", soilMoisture: [55, 80], temperature: [15, 25], humidity: [55, 85], soilPh: [6.0, 7.5] },
+  okra: { label: "Okra", soilMoisture: [50, 75], temperature: [22, 35], humidity: [45, 80], soilPh: [6.0, 7.5] },
+  cucumber: { label: "Cucumber", soilMoisture: [60, 85], temperature: [20, 32], humidity: [60, 90], soilPh: [5.8, 7.0] },
+  groundnut: { label: "Groundnut", soilMoisture: [45, 70], temperature: [22, 32], humidity: [45, 75], soilPh: [6.0, 7.5] },
+  peanut: { label: "Peanut", soilMoisture: [45, 70], temperature: [22, 32], humidity: [45, 75], soilPh: [6.0, 7.5] },
+  mustard: { label: "Mustard", soilMoisture: [40, 65], temperature: [10, 28], humidity: [35, 70], soilPh: [6.0, 7.5] },
+  chickpea: { label: "Chickpea", soilMoisture: [40, 65], temperature: [18, 30], humidity: [35, 70], soilPh: [6.0, 8.0] },
+  gram: { label: "Gram", soilMoisture: [40, 65], temperature: [18, 30], humidity: [35, 70], soilPh: [6.0, 8.0] },
+  pea: { label: "Pea", soilMoisture: [50, 75], temperature: [13, 24], humidity: [45, 75], soilPh: [6.0, 7.5] },
+  lentil: { label: "Lentil", soilMoisture: [40, 65], temperature: [18, 30], humidity: [35, 70], soilPh: [6.0, 8.0] },
+  sunflower: { label: "Sunflower", soilMoisture: [45, 70], temperature: [20, 32], humidity: [40, 75], soilPh: [6.0, 7.8] },
+  sesame: { label: "Sesame", soilMoisture: [35, 60], temperature: [22, 35], humidity: [35, 70], soilPh: [5.5, 8.0] },
+  sorghum: { label: "Sorghum", soilMoisture: [35, 65], temperature: [22, 35], humidity: [35, 70], soilPh: [5.5, 8.0] },
+  jowar: { label: "Jowar", soilMoisture: [35, 65], temperature: [22, 35], humidity: [35, 70], soilPh: [5.5, 8.0] },
+  millet: { label: "Millet", soilMoisture: [35, 65], temperature: [22, 35], humidity: [35, 70], soilPh: [5.5, 8.0] },
+  bajra: { label: "Bajra", soilMoisture: [35, 65], temperature: [22, 35], humidity: [35, 70], soilPh: [5.5, 8.0] },
+  turmeric: { label: "Turmeric", soilMoisture: [60, 85], temperature: [20, 35], humidity: [60, 90], soilPh: [5.5, 7.5] },
+  ginger: { label: "Ginger", soilMoisture: [60, 85], temperature: [20, 32], humidity: [60, 90], soilPh: [5.5, 7.0] },
+  garlic: { label: "Garlic", soilMoisture: [50, 75], temperature: [13, 28], humidity: [45, 70], soilPh: [6.0, 7.5] },
+  carrot: { label: "Carrot", soilMoisture: [55, 80], temperature: [15, 25], humidity: [45, 75], soilPh: [6.0, 7.0] },
+  radish: { label: "Radish", soilMoisture: [55, 80], temperature: [15, 28], humidity: [45, 75], soilPh: [6.0, 7.5] },
+  spinach: { label: "Spinach", soilMoisture: [55, 80], temperature: [10, 25], humidity: [50, 80], soilPh: [6.0, 7.5] },
+  lettuce: { label: "Lettuce", soilMoisture: [55, 80], temperature: [10, 24], humidity: [50, 80], soilPh: [6.0, 7.0] },
+  watermelon: { label: "Watermelon", soilMoisture: [50, 75], temperature: [22, 35], humidity: [45, 75], soilPh: [6.0, 7.5] },
+  muskmelon: { label: "Muskmelon", soilMoisture: [50, 75], temperature: [22, 35], humidity: [45, 75], soilPh: [6.0, 7.5] },
+  banana: { label: "Banana", soilMoisture: [60, 85], temperature: [20, 35], humidity: [60, 90], soilPh: [5.5, 7.5] },
+  mango: { label: "Mango", soilMoisture: [40, 70], temperature: [24, 38], humidity: [40, 75], soilPh: [5.5, 7.5] },
+  grapes: { label: "Grapes", soilMoisture: [45, 70], temperature: [15, 32], humidity: [40, 70], soilPh: [6.0, 7.5] },
+  apple: { label: "Apple", soilMoisture: [45, 70], temperature: [10, 28], humidity: [45, 75], soilPh: [5.8, 7.0] },
+  citrus: { label: "Citrus", soilMoisture: [45, 75], temperature: [18, 35], humidity: [45, 80], soilPh: [5.5, 7.5] },
+  orange: { label: "Orange", soilMoisture: [45, 75], temperature: [18, 35], humidity: [45, 80], soilPh: [5.5, 7.5] },
+  lemon: { label: "Lemon", soilMoisture: [45, 75], temperature: [18, 35], humidity: [45, 80], soilPh: [5.5, 7.5] },
+  papaya: { label: "Papaya", soilMoisture: [55, 80], temperature: [22, 35], humidity: [55, 85], soilPh: [6.0, 7.5] },
+  guava: { label: "Guava", soilMoisture: [40, 70], temperature: [20, 35], humidity: [40, 75], soilPh: [5.0, 7.5] },
+  vegetables: { label: "Vegetables", soilMoisture: [55, 80], temperature: [18, 32], humidity: [50, 80], soilPh: [6.0, 7.5] },
+  pulses: { label: "Pulses", soilMoisture: [45, 70], temperature: [18, 32], humidity: [40, 75], soilPh: [6.0, 7.5] },
+};
+
+const alertSensorMeta = {
+  soilMoisture: { label: "Soil moisture", unit: "%", icon: Droplets },
+  temperature: { label: "Temperature", unit: "°C", icon: CloudSun },
+  humidity: { label: "Humidity", unit: "%", icon: Radio },
+  soilPh: { label: "Soil pH", unit: "", icon: Sprout },
+};
+
+const normalizeCropName = (value = "") =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getCropSensorRange = (cropName = "") => {
+  const normalized = normalizeCropName(cropName);
+  if (!normalized || normalized === "fallow" || normalized === "none") return null;
+
+  const parts = normalized.split(/\s|,|\/|&|\+/).filter(Boolean);
+  const direct = cropSensorRanges[normalized] || parts.map((part) => cropSensorRanges[part]).find(Boolean);
+  return direct || { ...defaultCropSensorRange, label: cropName || defaultCropSensorRange.label };
+};
+
+const formatRange = ([min, max], unit = "") => `${min}${unit} - ${max}${unit}`;
+
 // Market prices by region
 const marketPricesByRegion = {
   Maharashtra: {
@@ -573,6 +661,62 @@ export default function Dashboard() {
   const t = (key) => copy[key] || dashboardCopy.en[key] || key;
   const chatText = { ...chatCopy.en, ...(chatCopy[language] || {}) };
   const ct = (key) => chatText[key] || chatCopy.en[key] || key;
+  const cropZones = useMemo(
+    () => [
+      { id: "zoneA", name: "Zone A", crop: userData.zoneA, area: "1.2 acres" },
+      { id: "zoneB", name: "Zone B", crop: userData.zoneB, area: "0.5 acres" },
+      { id: "zoneC", name: "Zone C", crop: userData.zoneC, area: "0.8 acres" },
+    ],
+    [userData.zoneA, userData.zoneB, userData.zoneC]
+  );
+  const activeSensorAlerts = useMemo(() => {
+    const alerts = [];
+
+    cropZones.forEach((zone) => {
+      const range = getCropSensorRange(zone.crop);
+      if (!range) return;
+
+      Object.entries(alertSensorMeta).forEach(([sensorKey, meta]) => {
+        const value = Number(sensorData[sensorKey]);
+        const safeRange = range[sensorKey];
+        if (!Number.isFinite(value) || !safeRange) return;
+
+        const [min, max] = safeRange;
+        if (value >= min && value <= max) return;
+
+        const direction = value < min ? "Low" : "High";
+        const severity = value < min ? min - value : value - max;
+        const tone = severity > (max - min) * 0.2 ? "critical" : "warning";
+
+        alerts.push({
+          id: `${zone.id}-${sensorKey}-${direction}`,
+          icon: meta.icon,
+          zone: zone.name,
+          crop: range.label,
+          sensorKey,
+          sensorLabel: meta.label,
+          title: `${direction} ${meta.label} - ${zone.name}`,
+          body: `${range.label} needs ${meta.label.toLowerCase()} around ${formatRange(safeRange, meta.unit)}. Current reading is ${value}${meta.unit}.`,
+          value,
+          unit: meta.unit,
+          min,
+          max,
+          tone,
+          time: "Now",
+        });
+      });
+    });
+
+    return alerts;
+  }, [cropZones, sensorData]);
+  const cropHealthScore = useMemo(() => {
+    const totalChecks = cropZones.reduce((count, zone) => {
+      const range = getCropSensorRange(zone.crop);
+      return range ? count + Object.keys(alertSensorMeta).length : count;
+    }, 0);
+    if (!totalChecks) return 100;
+    return Math.max(0, Math.round(((totalChecks - activeSensorAlerts.length) / totalChecks) * 100));
+  }, [activeSensorAlerts.length, cropZones]);
 
   const ownerPayload = useCallback(() => ({
     user_id: userData.id || null,
@@ -652,6 +796,16 @@ export default function Dashboard() {
   useEffect(() => {
     pumpsRef.current = pumps;
   }, [pumps]);
+
+  useEffect(() => {
+    activeSensorAlerts.slice(0, 3).forEach((alert) => {
+      toast.warning(alert.title, {
+        description: alert.body,
+        id: alert.id,
+        duration: 5000,
+      });
+    });
+  }, [activeSensorAlerts]);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -1605,7 +1759,7 @@ export default function Dashboard() {
     { id: "sensors", icon: Radio, label: t("sensors"), badge: t("live") },
     { id: "pump", icon: Droplets, label: t("pump") },
     { id: "weather", icon: CloudSun, label: t("weather") },
-    { id: "notifications", icon: Bell, label: t("notifications"), badge: "3" },
+    { id: "notifications", icon: Bell, label: t("notifications"), badge: activeSensorAlerts.length ? String(activeSensorAlerts.length) : null },
     { id: "market", icon: BarChart3, label: t("market") },
     { id: "flow", icon: Zap, label: t("flow") },
     { id: "ai", icon: Brain, label: t("ai"), badge: "New" },
@@ -1969,6 +2123,8 @@ export default function Dashboard() {
 
   // Field Map Component
   const FieldMap = () => {
+    const zoneHasAlert = (zoneName) => activeSensorAlerts.some((alert) => alert.zone === zoneName);
+
     return (
       <div className="p-5 rounded-xl bg-white border border-[#e8e3d8] shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -1979,12 +2135,12 @@ export default function Dashboard() {
           {/* Simulated field map with zones */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="grid grid-cols-3 gap-2 p-4 w-full h-full">
-              {/* Zone A - Wheat */}
+              {/* Zone A */}
               <div className="relative rounded-lg overflow-hidden" style={{ background: "#4a8a5a", gridColumn: "span 2" }}>
-                <div className="absolute top-2 left-2 text-white text-xs font-medium">Zone A - Wheat</div>
+                <div className="absolute top-2 left-2 text-white text-xs font-medium">Zone A - {userData.zoneA || "Crop"}</div>
                 <div className="absolute bottom-2 left-2 text-white/70 text-xs">1.2 acres</div>
                 <div className="absolute top-2 right-2">
-                  <Droplets className="w-4 h-4 text-green-200" />
+                  {zoneHasAlert("Zone A") ? <AlertTriangle className="w-4 h-4 text-amber-300" /> : <Droplets className="w-4 h-4 text-green-200" />}
                 </div>
                 {/* Simulated crop rows */}
                 <div className="absolute inset-0 flex flex-col justify-around p-4">
@@ -1995,16 +2151,19 @@ export default function Dashboard() {
               </div>
               {/* Zone B - Vegetables */}
               <div className="relative rounded-lg overflow-hidden" style={{ background: "#3a7a4a" }}>
-                <div className="absolute top-2 left-2 text-white text-xs font-medium">Zone B</div>
+                <div className="absolute top-2 left-2 text-white text-xs font-medium">Zone B - {userData.zoneB || "Crop"}</div>
                 <div className="absolute bottom-2 left-2 text-white/70 text-xs">0.5 acres</div>
                 <div className="absolute top-2 right-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-300" />
+                  {zoneHasAlert("Zone B") ? <AlertTriangle className="w-4 h-4 text-amber-300" /> : <Droplets className="w-4 h-4 text-green-200" />}
                 </div>
               </div>
               {/* Zone C - Fallow */}
               <div className="relative rounded-lg overflow-hidden" style={{ background: "#5a9a5a" }}>
-                <div className="absolute top-2 left-2 text-white text-xs font-medium">Zone C</div>
+                <div className="absolute top-2 left-2 text-white text-xs font-medium">Zone C - {userData.zoneC || "Crop"}</div>
                 <div className="absolute bottom-2 left-2 text-white/70 text-xs">0.8 acres</div>
+                <div className="absolute top-2 right-2">
+                  {zoneHasAlert("Zone C") ? <AlertTriangle className="w-4 h-4 text-amber-300" /> : null}
+                </div>
               </div>
               {/* Water body */}
               <div className="relative rounded-lg overflow-hidden" style={{ background: "#2a6aaa", gridColumn: "span 2" }}>
@@ -2067,59 +2226,61 @@ export default function Dashboard() {
               <div className="p-5 rounded-xl bg-white border border-[#e8e3d8] shadow-sm">
                 <h3 className="font-semibold mb-4" style={{ color: colors.textDark }}>Active Alerts</h3>
                 <div className="space-y-3">
-                  <div className="flex gap-3 p-3 rounded-lg" style={{ background: "#fef3c7", border: "1px solid #f59e0b" }}>
-                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-amber-800">Low Soil Moisture - Zone B</p>
-                      <p className="text-sm text-amber-700">Moisture at 42%, below optimal threshold</p>
-                      <p className="text-xs text-amber-600 mt-1">2 hours ago</p>
+                  {activeSensorAlerts.length ? (
+                    activeSensorAlerts.slice(0, 4).map((alert) => {
+                      const isCritical = alert.tone === "critical";
+                      return (
+                        <div
+                          key={alert.id}
+                          className="flex gap-3 p-3 rounded-lg"
+                          style={{
+                            background: isCritical ? "#fee2e2" : "#fef3c7",
+                            border: `1px solid ${isCritical ? "#ef4444" : "#f59e0b"}`,
+                          }}
+                        >
+                          <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isCritical ? "text-red-600" : "text-amber-600"}`} />
+                          <div>
+                            <p className={`font-medium ${isCritical ? "text-red-800" : "text-amber-800"}`}>{alert.title}</p>
+                            <p className={`text-sm ${isCritical ? "text-red-700" : "text-amber-700"}`}>{alert.body}</p>
+                            <p className={`text-xs mt-1 ${isCritical ? "text-red-600" : "text-amber-600"}`}>Crop profile: {alert.crop}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex gap-3 p-3 rounded-lg border border-green-200 bg-green-50">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-green-800">All sensor readings are normal</p>
+                        <p className="text-sm text-green-700">Moisture, temperature, humidity and pH are inside the selected crop ranges.</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-3 p-3 rounded-lg" style={{ background: "#dbeafe", border: "1px solid #3b82f6" }}>
-                    <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-blue-800">Irrigation Complete</p>
-                      <p className="text-sm text-blue-700">Pump 1 completed scheduled cycle</p>
-                      <p className="text-xs text-blue-600 mt-1">5 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 p-3 rounded-lg" style={{ background: "#fee2e2", border: "1px solid #ef4444" }}>
-                    <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-red-800">Sensor Offline - Node 4</p>
-                      <p className="text-sm text-red-700">No data received for 30 minutes</p>
-                      <p className="text-xs text-red-600 mt-1">1 day ago</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
               <div className="p-5 rounded-xl bg-white border border-[#e8e3d8] shadow-sm">
                 <h3 className="font-semibold mb-4" style={{ color: colors.textDark }}>Crop Health Score</h3>
                 <div className="flex items-center gap-6">
-                  <SemicircleGauge value={74} max={100} size={140} />
+                  <SemicircleGauge value={cropHealthScore} max={100} size={140} />
                   <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><span className="text-lg">🌾</span></div>
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: colors.textDark }}>Nitrogen</p>
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">Good</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center"><span className="text-lg">🌱</span></div>
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: colors.textDark }}>Phosphorus</p>
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">Low</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><span className="text-lg">🌿</span></div>
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: colors.textDark }}>Potassium</p>
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">Good</span>
-                      </div>
-                    </div>
+                    {cropZones.map((zone) => {
+                      const range = getCropSensorRange(zone.crop);
+                      const zoneAlerts = activeSensorAlerts.filter((alert) => alert.zone === zone.name);
+                      return (
+                        <div key={zone.id} className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${zoneAlerts.length ? "bg-amber-100" : "bg-green-100"}`}>
+                            {zoneAlerts.length ? <AlertTriangle className="w-5 h-5 text-amber-700" /> : <CheckCircle2 className="w-5 h-5 text-green-700" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium" style={{ color: colors.textDark }}>{zone.name} - {range?.label || "Fallow"}</p>
+                            <span className={`px-2 py-0.5 text-xs rounded-full ${zoneAlerts.length ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                              {zoneAlerts.length ? `${zoneAlerts.length} alert${zoneAlerts.length > 1 ? "s" : ""}` : "Normal"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -2152,6 +2313,47 @@ export default function Dashboard() {
               <SensorCard icon={Leaf} title="Nitrogen" value={sensorData.nitrogen} unit="mg/kg" color="green" min="0" max="100" barValue={Math.min(sensorData.nitrogen, 100)} />
               <SensorCard icon={Wheat} title="Phosphorus" value={sensorData.phosphorus} unit="mg/kg" color="orange" min="0" max="100" barValue={Math.min(sensorData.phosphorus, 100)} />
               <SensorCard icon={Flower2} title="Potassium" value={sensorData.potassium} unit="mg/kg" color="blue" min="0" max="100" barValue={Math.min(sensorData.potassium, 100)} />
+            </div>
+
+            <div className="p-5 rounded-xl bg-white border border-[#e8e3d8] shadow-sm overflow-x-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <h3 className="font-semibold" style={{ color: colors.textDark }}>Crop Sensor Alert Ranges</h3>
+                <span className="text-xs" style={{ color: colors.textLight }}>NPK sensors are monitored separately and do not trigger these alerts.</span>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: colors.creamDark }}>
+                    <th className="text-left py-3 px-3 font-medium" style={{ color: colors.textMid }}>Zone</th>
+                    <th className="text-left py-3 px-3 font-medium" style={{ color: colors.textMid }}>Crop profile</th>
+                    <th className="text-left py-3 px-3 font-medium" style={{ color: colors.textMid }}>Moisture</th>
+                    <th className="text-left py-3 px-3 font-medium" style={{ color: colors.textMid }}>Temp</th>
+                    <th className="text-left py-3 px-3 font-medium" style={{ color: colors.textMid }}>Humidity</th>
+                    <th className="text-left py-3 px-3 font-medium" style={{ color: colors.textMid }}>pH</th>
+                    <th className="text-left py-3 px-3 font-medium" style={{ color: colors.textMid }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cropZones.map((zone) => {
+                    const range = getCropSensorRange(zone.crop);
+                    const zoneAlerts = activeSensorAlerts.filter((alert) => alert.zone === zone.name);
+                    return (
+                      <tr key={zone.id} className="border-b last:border-0" style={{ borderColor: colors.creamDark }}>
+                        <td className="py-3 px-3 font-medium" style={{ color: colors.textDark }}>{zone.name}</td>
+                        <td className="py-3 px-3" style={{ color: colors.textMid }}>{range?.label || "Fallow"}</td>
+                        <td className="py-3 px-3 font-mono" style={{ color: colors.textDark }}>{range ? formatRange(range.soilMoisture, "%") : "-"}</td>
+                        <td className="py-3 px-3 font-mono" style={{ color: colors.textDark }}>{range ? formatRange(range.temperature, "°C") : "-"}</td>
+                        <td className="py-3 px-3 font-mono" style={{ color: colors.textDark }}>{range ? formatRange(range.humidity, "%") : "-"}</td>
+                        <td className="py-3 px-3 font-mono" style={{ color: colors.textDark }}>{range ? formatRange(range.soilPh, "") : "-"}</td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-1 rounded-full text-xs ${zoneAlerts.length ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                            {range ? (zoneAlerts.length ? `${zoneAlerts.length} alert${zoneAlerts.length > 1 ? "s" : ""}` : "Normal") : "No crop"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
             <div className="p-5 rounded-xl bg-white border border-[#e8e3d8] shadow-sm overflow-x-auto">
@@ -2394,13 +2596,32 @@ export default function Dashboard() {
         );
 
       case "notifications":
+        const notificationItems = [
+          ...activeSensorAlerts.map((alert) => ({
+            icon: alert.icon,
+            title: alert.title,
+            body: alert.body,
+            tone: alert.tone === "critical" ? colors.red : colors.terracotta,
+            time: alert.time,
+          })),
+          { icon: CloudSun, title: "Rain chance updated", body: `Latest forecast shows ${Math.max(...(weatherData?.rainfall || [{ value: 0 }]).map((item) => item.value))}% peak rainfall probability this week.`, tone: colors.blue, time: "12 min ago" },
+          { icon: Info, title: "Pump schedule ready", body: "Weekly irrigation log is available on the Pump Control page.", tone: colors.greenLight, time: "Today" },
+        ];
+
         return (
           <div className="space-y-4">
-            {[
-              { icon: AlertTriangle, title: "Low moisture in Zone B", body: "Soil moisture is trending below the safe irrigation threshold.", tone: colors.terracotta, time: "Now" },
-              { icon: CloudSun, title: "Rain chance updated", body: `Latest forecast shows ${Math.max(...(weatherData?.rainfall || [{ value: 0 }]).map((item) => item.value))}% peak rainfall probability this week.`, tone: colors.blue, time: "12 min ago" },
-              { icon: Info, title: "Pump schedule ready", body: "Weekly irrigation log is available on the Pump Control page.", tone: colors.greenLight, time: "Today" },
-            ].map((item) => (
+            {activeSensorAlerts.length === 0 && (
+              <div className="p-4 sm:p-5 rounded-xl bg-green-50 border border-green-200 shadow-sm flex items-start gap-4">
+                <span className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 text-green-700">
+                  <CheckCircle2 className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="font-semibold text-green-900">No crop sensor alerts</h3>
+                  <p className="mt-1 text-sm text-green-800">All non-NPK readings are inside the normal crop range for the selected zones.</p>
+                </div>
+              </div>
+            )}
+            {notificationItems.map((item) => (
               <div key={item.title} className="p-4 sm:p-5 rounded-xl bg-white border border-[#e8e3d8] shadow-sm flex items-start gap-4">
                 <span className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${item.tone}18`, color: item.tone }}>
                   <item.icon className="w-5 h-5" />
@@ -3119,7 +3340,7 @@ export default function Dashboard() {
               </div>
               <button onClick={() => setActivePage("notifications")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative" aria-label="Open notifications">
                 <Bell className="w-4 h-4" style={{ color: colors.textMid }} />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
+                {activeSensorAlerts.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />}
               </button>
             </div>
           </div>

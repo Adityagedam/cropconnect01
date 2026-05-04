@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "C:\Users\adity\OneDrive\Desktop\cropconnect-main 2\cropconnect-main\cropconnect-backend\esp32_ingest.py", line 13, in <module>
-    import mysql.connector
-ModuleNotFoundError: No module named 'mysql'
