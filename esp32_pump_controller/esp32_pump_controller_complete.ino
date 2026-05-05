@@ -25,8 +25,8 @@
 // Update these values for your setup
 
 // WiFi Configuration
-const char* WIFI_SSID = "YOUR_WIFI_SSID";           // Replace with your WiFi name
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";   // Replace with your WiFi password
+const char* WIFI_SSID = "motorola edge 20 fusion_2684";           // Replace with your WiFi name
+const char* WIFI_PASSWORD = "12345678";   // Replace with your WiFi password
 
 // API Configuration
 const char* API_KEY = "dev-secret-key";             // Must match backend ESP32_API_KEY
