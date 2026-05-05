@@ -1143,29 +1143,52 @@ async def receive(request: Request):
 @app.get("/api/sensors/latest")
 def latest_sensors(device_id: str = Query(default="sim-node-1", max_length=80)):
     ensure_sensor_tables()
-    query = """
-        SELECT
-          id,
-          device_id,
-          soil_moisture,
-          humidity,
-          temperature,
-          ph,
-          nitrogen,
-          phosphorus,
-          potassium,
-          recorded_at
-        FROM sensor_readings
-        WHERE device_id = %s
-        ORDER BY recorded_at DESC, id DESC
-        LIMIT 1
-    """
+    sensor_meta = [
+        ("soil_moisture", "%"),
+        ("humidity", "%"),
+        ("temperature", "C"),
+        ("ph", "pH"),
+        ("nitrogen", "mg/kg"),
+        ("phosphorus", "mg/kg"),
+        ("potassium", "mg/kg"),
+    ]
 
     try:
         with get_connection() as conn:
             with conn.cursor(dictionary=True) as cursor:
-                cursor.execute(query, (device_id,))
-                row = cursor.fetchone()
+                readings = []
+                latest_recorded_at = None
+
+                for sensor_type, unit in sensor_meta:
+                    cursor.execute(
+                        f"""
+                        SELECT
+                          device_id,
+                          {sensor_type} AS value,
+                          recorded_at
+                        FROM sensor_readings
+                        WHERE device_id = %s
+                          AND {sensor_type} IS NOT NULL
+                        ORDER BY recorded_at DESC, id DESC
+                        LIMIT 1
+                        """,
+                        (device_id,),
+                    )
+                    row = cursor.fetchone()
+                    if not row:
+                        continue
+
+                    recorded_at = row["recorded_at"]
+                    if latest_recorded_at is None or recorded_at > latest_recorded_at:
+                        latest_recorded_at = recorded_at
+
+                    readings.append({
+                        "sensor_type": sensor_type,
+                        "value": decimal_to_float(row["value"]),
+                        "unit": unit,
+                        "recorded_at": decimal_to_float(recorded_at),
+                        "device_id": row["device_id"],
+                    })
     except Exception as exc:
         return {
             "device_id": device_id,
@@ -1174,13 +1197,13 @@ def latest_sensors(device_id: str = Query(default="sim-node-1", max_length=80)):
             "message": str(exc),
         }
 
-    if not row:
+    if not readings:
         return {"device_id": device_id, "readings": [], "message": "No readings yet"}
 
     return {
-        "device_id": row["device_id"],
-        "recorded_at": decimal_to_float(row["recorded_at"]),
-        "readings": reading_to_sensor_list(row),
+        "device_id": device_id,
+        "recorded_at": decimal_to_float(latest_recorded_at),
+        "readings": readings,
     }
 
 

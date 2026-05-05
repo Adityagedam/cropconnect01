@@ -2,17 +2,30 @@
  * ESP32 pH Sensor Telemetry Only for CropConnect
  *
  * Reads pH probe analog voltage from GPIO 34 and sends pH telemetry to
- * CropConnect over WiFi.
+ * CropConnect over WiFi. Also displays pH on an I2C OLED screen.
  *
  * Update:
  * - WIFI_SSID
  * - WIFI_PASSWORD
  * - DEVICE_ID to match your dashboard sensor setup
+ *
+ * OLED wiring for common 0.96" SSD1306 I2C display:
+ * - OLED SDA -> ESP32 GPIO 21
+ * - OLED SCL -> ESP32 GPIO 22
+ * - OLED VCC -> 3.3V
+ * - OLED GND -> GND
+ *
+ * Libraries required:
+ * - Adafruit SSD1306
+ * - Adafruit GFX Library
  */
 
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 // ===== WIFI CONFIGURATION =====
 const char* WIFI_SSID = "motorola edge 20 fusion_2684";
@@ -25,6 +38,25 @@ const char* TELEMETRY_URL = "https://cropconnect01-production.up.railway.app/api
 
 // ===== pH SENSOR CONFIGURATION =====
 #define PH_PIN 34
+
+// Your pH module has a low-voltage output range, so status is read from
+// these voltage bands based on your tested code.
+const float ACIDIC_MAX_VOLTAGE = 1.58;
+const float BASIC_MIN_VOLTAGE = 1.69;
+
+// The CropConnect dashboard expects a numeric pH value.
+// These values represent the sensor status band. For exact pH, use buffer calibration.
+const float ACIDIC_PH_VALUE = 6.0;
+const float NEUTRAL_PH_VALUE = 7.0;
+const float BASIC_PH_VALUE = 8.0;
+
+// ===== OLED DISPLAY CONFIGURATION =====
+const int SCREEN_WIDTH = 128;
+const int SCREEN_HEIGHT = 64;
+const int OLED_RESET = -1;
+const int OLED_ADDRESS = 0x3C;
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool displayReady = false;
 
 // Send pH to dashboard every 8 seconds.
 const unsigned long TELEMETRY_INTERVAL_MS = 8000;
@@ -49,27 +81,23 @@ float readVoltage() {
 }
 
 String phStatusFromVoltage(float voltage) {
-  if (voltage > 1.80) {
+  if (voltage < ACIDIC_MAX_VOLTAGE) {
     return "ACIDIC";
   }
-  if (voltage < 1.70) {
-    return "NEUTRAL";
+  if (voltage > BASIC_MIN_VOLTAGE) {
+    return "BASIC";
   }
-  return "BASIC";
+  return "NEUTRAL";
 }
 
-float phValueFromVoltage(float voltage) {
-  String status = phStatusFromVoltage(voltage);
-
-  // These are dashboard-friendly representative pH values based on your status bands.
-  // For precise pH, calibrate with pH 4, 7, and 10 buffer solutions.
+float phValueFromStatus(String status) {
   if (status == "ACIDIC") {
-    return 5.8;
+    return ACIDIC_PH_VALUE;
   }
-  if (status == "NEUTRAL") {
-    return 7.0;
+  if (status == "BASIC") {
+    return BASIC_PH_VALUE;
   }
-  return 8.0;
+  return NEUTRAL_PH_VALUE;
 }
 
 bool connectToWiFi() {
@@ -102,22 +130,45 @@ bool connectToWiFi() {
   return false;
 }
 
+void updateDisplay(float phValue, float voltage, String status, bool sentOk) {
+  if (!displayReady) {
+    return;
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.println("CropConnect pH");
+
+  display.setTextSize(2);
+  display.setCursor(0, 18);
+  display.print("pH ");
+  display.println(phValue, 2);
+
+  display.setTextSize(1);
+  display.setCursor(0, 44);
+  display.print("Volt: ");
+  display.print(voltage, 3);
+  display.println(" V");
+  display.print(status);
+  display.print(" | ");
+  display.println(sentOk ? "Sent" : "Waiting");
+  display.display();
+}
+
 String buildTelemetryJson(float phValue, float voltage, String status) {
   String body = "{";
   body += "\"device_id\":\"" + String(DEVICE_ID) + "\",";
-  body += "\"ph\":" + String(phValue, 2) + ",";
-  body += "\"raw_payload\":{";
-  body += "\"ph_voltage\":" + String(voltage, 3) + ",";
-  body += "\"ph_status\":\"" + status + "\"";
-  body += "}";
+  body += "\"ph\":" + String(phValue, 2);
   body += "}";
   return body;
 }
 
-void postTelemetry(const String& payload) {
+bool postTelemetry(const String& payload) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected, telemetry skipped");
-    return;
+    return false;
   }
 
   HTTPClient http;
@@ -129,6 +180,7 @@ void postTelemetry(const String& payload) {
   Serial.println(payload);
 
   int httpCode = http.POST(payload);
+  bool sentOk = httpCode >= 200 && httpCode < 300;
   if (httpCode > 0) {
     Serial.println("Telemetry POST HTTP " + String(httpCode));
     Serial.println("Response: " + http.getString());
@@ -137,6 +189,7 @@ void postTelemetry(const String& payload) {
   }
 
   http.end();
+  return sentOk;
 }
 
 void setup() {
@@ -148,6 +201,20 @@ void setup() {
 
   pinMode(PH_PIN, INPUT);
   secureClient.setInsecure();
+
+  Wire.begin(21, 22);
+  displayReady = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS);
+  if (displayReady) {
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println("CropConnect pH");
+    display.println("Starting...");
+    display.display();
+  } else {
+    Serial.println("OLED not found at 0x3C. pH telemetry will still work.");
+  }
 
   connectToWiFi();
 
@@ -170,7 +237,7 @@ void loop() {
 
     float voltage = readVoltage();
     String status = phStatusFromVoltage(voltage);
-    float phValue = phValueFromVoltage(voltage);
+    float phValue = phValueFromStatus(status);
 
     Serial.print("Voltage: ");
     Serial.print(voltage, 3);
@@ -180,7 +247,8 @@ void loop() {
     Serial.println(phValue, 2);
 
     String payload = buildTelemetryJson(phValue, voltage, status);
-    postTelemetry(payload);
+    bool sentOk = postTelemetry(payload);
+    updateDisplay(phValue, voltage, status, sentOk);
   }
 
   delay(50);

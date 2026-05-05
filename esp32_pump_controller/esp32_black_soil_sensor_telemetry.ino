@@ -56,6 +56,7 @@ const unsigned long MODEM_BAUD = 9600;
 // ===== CROPConnect API CONFIGURATION =====
 const char* API_KEY = "dev-secret-key";
 const char* DEVICE_ID = "sim-node-1";
+const char* FIRMWARE_TAG = "REAL_SENSOR_ONLY_SIM800L_V2";
 
 // SIM800L HTTPS can be unreliable with modern TLS/SNI.
 // If HTTPS fails, deploy/use an HTTP telemetry proxy or local backend URL.
@@ -146,13 +147,20 @@ bool connectToGprs() {
   return true;
 }
 
-float readSoilMoisturePercent() {
-  int raw = analogRead(SOIL_MOISTURE_PIN);
+bool readSoilMoisturePercent(float& soilMoisture, int& raw) {
+  raw = analogRead(SOIL_MOISTURE_PIN);
+
+  if (raw <= 20 || raw >= 4075) {
+    Serial.println("Soil moisture ADC invalid or disconnected: " + String(raw));
+    return false;
+  }
+
   int moisture = map(raw, SOIL_DRY_RAW, SOIL_WET_RAW, 0, 100);
   moisture = constrain(moisture, 0, 100);
 
   Serial.println("Soil moisture raw ADC: " + String(raw));
-  return (float)moisture;
+  soilMoisture = (float)moisture;
+  return true;
 }
 
 bool readDhtValues(float& temperature, float& humidity) {
@@ -186,6 +194,11 @@ bool readNpkSensor(float& n, float& p, float& k) {
   n = (float)npkNode.getResponseBuffer(0);
   p = (float)npkNode.getResponseBuffer(1);
   k = (float)npkNode.getResponseBuffer(2);
+
+  if ((n + p + k) <= 0) {
+    Serial.println("NPK Modbus returned all zero values. Check sensor power, soil contact, and register address.");
+    return false;
+  }
 
   return true;
 }
@@ -237,6 +250,7 @@ void setup() {
 
   Serial.println();
   Serial.println("=== CropConnect Black Soil Sensor Telemetry - SIM800L ===");
+  Serial.println("Firmware: " + String(FIRMWARE_TAG));
   Serial.println("Real: soil moisture, temperature, humidity, NPK");
 
   dht.begin();
@@ -282,7 +296,14 @@ void loop() {
       return;
     }
 
-    float soilMoisture = readSoilMoisturePercent();
+    float soilMoisture = 0.0;
+    int soilRaw = 0;
+    bool soilOk = readSoilMoisturePercent(soilMoisture, soilRaw);
+    if (!soilOk) {
+      Serial.println("Skipping telemetry until real soil moisture sensor gives a valid reading");
+      return;
+    }
+
     bool npkOk = readNpkSensor(nitrogen, phosphorus, potassium);
     if (!npkOk) {
       Serial.println("Skipping telemetry until real NPK sensor gives a valid reading");
@@ -290,6 +311,7 @@ void loop() {
     }
 
     Serial.println("Soil moisture: " + String(soilMoisture, 1) + "%");
+    Serial.println("Soil moisture proof raw ADC: " + String(soilRaw));
     Serial.println("Temperature: " + String(temperature, 1) + " C");
     Serial.println("Humidity: " + String(humidity, 1) + "%");
     Serial.println("Real NPK: " + String(nitrogen, 1) + "/" + String(phosphorus, 1) + "/" + String(potassium, 1) + " mg/kg");
